@@ -1,0 +1,53 @@
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+
+const connectDB = require('./config/db');
+const errorHandler = require('./middleware/errorHandler');
+const notFound = require('./middleware/notFound');
+const { authRoutes, ticketRoutes, gatePassRoutes, noticeRoutes, messRoutes, attendanceRoutes, pushRoutes, locationRoutes } = require('./routes');
+
+const app = express();
+
+// Middleware
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+}));
+app.use(express.json());
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api', authRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/gate-passes', gatePassRoutes);
+app.use('/api/notices', noticeRoutes);
+app.use('/api/mess', messRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/push', pushRoutes);
+app.use('/api/locations', locationRoutes);
+
+// 404 handler
+app.use(notFound);
+
+// Error handler (must be last)
+app.use(errorHandler);
+
+module.exports = {
+  app,
+  connectDB
+};
