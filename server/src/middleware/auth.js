@@ -23,7 +23,7 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verifyToken(token);
 
     // Find user by id from token
-    const user = await User.findById(decoded.userId).select('-passwordHash');
+    const user = await User.findById(decoded.userId).select('-passwordHash').populate('locationId');
 
     if (!user) {
       throw new ApiError(401, 'Invalid token');

@@ -93,6 +93,7 @@ export interface CafeteriaItem {
   veg: boolean;
   prepTimeMinutes: number;
   available: boolean;
+  tag?: string;
 }
 
 export interface CafeteriaOrder {
@@ -103,9 +104,13 @@ export interface CafeteriaOrder {
   hostelBlock: string;
   items: { item: CafeteriaItem; quantity: number }[];
   totalAmount: number;
-  status: 'received' | 'preparing' | 'out_for_delivery' | 'delivered';
+  status: 'received' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled';
   placedAt: string;
+  createdAt?: number;
   deliveryOtp: string;
+  rating?: number;
+  review?: string;
+  reviewedAt?: string;
 }
 
 export interface RoomBed {

@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema({
     enum: ['Hostel A', 'Hostel B', 'Hostel C'], // Adjust as needed
     // Will be validated based on role in controller/service
   },
+  roomNumber: {
+    type: String,
+    trim: true
+  },
   batch: {
     type: String,
     // e.g., '2023', '2024', etc.

@@ -19,6 +19,7 @@ const registerSchema = z.object({
   // Optional fields based on role
   locationId: z.string().optional(), // For students
   hostel: z.string().optional(), // For students/wardens
+  roomNumber: z.string().optional(), // For students
   batch: z.string().optional(), // For students
   shifts: z.array(z.object({
     category: z.enum(['IT', 'ELECTRICAL', 'PLUMBING', 'CARPENTRY', 'HVAC', 'OTHER']),

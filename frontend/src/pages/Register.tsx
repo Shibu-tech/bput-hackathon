@@ -28,6 +28,7 @@ const Register: React.FC = () => {
     password: '',
     role: 'STUDENT',
     hostel: 'Hostel A',
+    roomNumber: '101',
     batch: '2024',
     technicianTrade: 'ELECTRICAL',
     agreeTerms: true,
@@ -68,6 +69,7 @@ const Register: React.FC = () => {
 
       if (formData.role === 'STUDENT') {
         if (formData.hostel) userData.hostel = formData.hostel;
+        if (formData.roomNumber) userData.roomNumber = formData.roomNumber.trim();
         if (formData.batch) userData.batch = formData.batch;
       } else if (formData.role === 'WARDEN') {
         if (formData.hostel) userData.hostel = formData.hostel;
@@ -197,6 +199,21 @@ const Register: React.FC = () => {
                   <option value="Hostel B">Hostel B (Boys)</option>
                   <option value="Hostel C">Hostel C (Girls)</option>
                 </select>
+              </div>
+
+              <div>
+                <label htmlFor="roomNumber" className="block text-xs font-medium text-slate-700 mb-1">
+                  Room Number
+                </label>
+                <input
+                  id="roomNumber"
+                  name="roomNumber"
+                  type="text"
+                  placeholder="e.g. 101, 204"
+                  className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                  value={formData.roomNumber}
+                  onChange={handleChange}
+                />
               </div>
 
               <div>
