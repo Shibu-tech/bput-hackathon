@@ -30,25 +30,24 @@ const validate = (schema, source = 'body') => {
 
       next();
     } catch (error) {
-      if (error.constructor.name === 'ZodError') {
-        // Format Zod errors - with defensive check for error.errors
-        if (error.errors && Array.isArray(error.errors)) {
-          const formattedErrors = error.errors.map(err => ({
-            field: err.path.join('.'),
+      if (error.name === 'ZodError' || error.constructor.name === 'ZodError') {
+        const issues = Array.isArray(error.issues) ? error.issues : (Array.isArray(error.errors) ? error.errors : []);
+        if (issues.length > 0) {
+          const formattedErrors = issues.map(err => ({
+            field: Array.isArray(err.path) ? err.path.join('.') : '',
             message: err.message
           }));
 
           return res.status(400).json({
             success: false,
-            message: 'Validation failed',
+            message: formattedErrors[0].message || 'Validation failed',
             errors: formattedErrors
           });
         } else {
-          // Fallback if error.errors is not as expected
           return res.status(400).json({
             success: false,
-            message: 'Validation failed',
-            errors: [{ message: 'Validation error occurred' }]
+            message: error.message || 'Validation failed',
+            errors: [{ message: error.message || 'Validation error occurred' }]
           });
         }
       }

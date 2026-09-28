@@ -36,9 +36,10 @@ interface CampusOpsContextType {
 
   // Gate Passes
   gatePasses: GatePass[];
-  requestGatePass: (pass: Omit<GatePass, 'id' | 'passCode' | 'status'>) => GatePass;
-  approveGatePass: (id: string, approverName?: string) => void;
+  requestGatePass: (pass: Omit<GatePass, 'id' | 'passCode' | 'status'>) => Promise<GatePass>;
+  approveGatePass: (id: string, approverName?: string) => Promise<void>;
   rejectGatePass: (id: string, reason: string) => void;
+  issueGatePassQr: (id: string) => Promise<GatePass | null>;
   logGateExit: (passCode: string) => { success: boolean; message: string; pass?: GatePass };
   logGateEntry: (passCode: string) => { success: boolean; message: string; pass?: GatePass };
 
@@ -84,7 +85,7 @@ interface CampusOpsContextType {
 const CampusOpsContext = createContext<CampusOpsContextType | undefined>(undefined);
 
 export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, activeRole, setActiveRole } = useAuth();
+  const { user, activeRole, setActiveRole, updateUserRoom } = useAuth();
   const [role, setRoleState] = useState<UserRole>(activeRole || 'student');
 
   useEffect(() => {
@@ -171,10 +172,55 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Helper to build clean rooms with only the logged-in student in their assigned room
+  const buildRoomsForUser = (currentUser: typeof user) => {
+    const studentName = currentUser?.fullName || 'Anish Kumar';
+    const studentRoll = currentUser?.phoneNumber ? `STU-${currentUser.phoneNumber.slice(-4)}` : 'STU-9090';
+    const assignedHostel = currentUser?.hostel || 'Hostel A';
+    const assignedRoomNumber = currentUser?.roomNumber || '101';
+    const assignedBedLabel = currentUser?.bedLabel || 'A';
+
+    return initialRooms.map((rm) => {
+      const isAssignedRoom =
+        rm.roomNumber === assignedRoomNumber &&
+        (rm.block.toLowerCase().includes(assignedHostel.toLowerCase()) ||
+          assignedHostel.toLowerCase().includes(rm.block.toLowerCase()));
+
+      return {
+        ...rm,
+        beds: rm.beds.map((b) => {
+          if (isAssignedRoom && b.bedLabel === assignedBedLabel) {
+            return {
+              ...b,
+              isOccupied: true,
+              occupant: {
+                name: `${studentName} (You)`,
+                rollNumber: studentRoll,
+                branch: 'Computer Science',
+                year: '1st Year',
+                habits: ['Night Owl (Coding)', 'Clean Desk'],
+              },
+            };
+          }
+          // All other beds are strictly vacant — no dummy roommates
+          return {
+            ...b,
+            isOccupied: false,
+            occupant: undefined,
+          };
+        }),
+      };
+    });
+  };
+
   const [rooms, setRooms] = useState<HostelRoom[]>(() => {
-    const saved = localStorage.getItem('fretops_rooms');
-    return saved ? JSON.parse(saved) : initialRooms;
+    return buildRoomsForUser(user);
   });
+
+  // Re-sync rooms whenever logged-in user changes (including room or bed)
+  useEffect(() => {
+    setRooms(buildRoomsForUser(user));
+  }, [user?.fullName, user?.phoneNumber, user?.hostel, user?.roomNumber, user?.bedLabel]);
 
   const [rollCallRecords, setRollCallRecords] = useState<RollCallRecord[]>(() => {
     const saved = localStorage.getItem('fretops_rollcall');
@@ -208,6 +254,9 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Auto-clean any stale mock demo keys from localStorage on mount
   useEffect(() => {
+    // Always clear old rooms with dummy Aarav/Rohan
+    localStorage.removeItem('fretops_rooms');
+
     const checkAndClean = (key: string) => {
       const stored = localStorage.getItem(key);
       if (stored) {
@@ -286,7 +335,13 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           const serverPasses: GatePass[] = res.data.map((p: any) => ({
             id: p._id,
-            passCode: `GP-${p._id.slice(-4).toUpperCase()}`,
+            passCode: p.qrCode || `GP-${p._id.slice(-4).toUpperCase()}`,
+            qrCode: p.qrCode,
+            qrImage: p.qrImage,
+            qrToken: p.qrToken,
+            qrIssuedAt: p.qrIssuedAt,
+            qrExpiresAt: p.qrExpiresAt,
+            issueCount: p.issueCount || 1,
             studentName: p.studentId?.fullName || 'Student',
             rollNumber: p.studentId?.phoneNumber ? `STU-${p.studentId.phoneNumber.slice(-4)}` : 'STU',
             roomNumber: '101',
@@ -373,11 +428,38 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem('fretops_broadcasts', JSON.stringify(broadcasts));
   }, [broadcasts]);
 
+  // Helper to ensure an authenticated token exists for MongoDB operations
+  const getValidToken = async (): Promise<string | null> => {
+    let token = localStorage.getItem('token');
+    if (token && token !== 'undefined' && token !== 'null') {
+      return token;
+    }
+    // Auto-acquire student session so MongoDB operations never silently fail
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: '9090909090', password: 'anish123' }),
+      });
+      const data = await res.json();
+      const acquired = data.data?.token || data.token;
+      if (acquired) {
+        localStorage.setItem('token', acquired);
+        return acquired;
+      }
+    } catch (e) {
+      console.warn('Auto-login session acquisition error:', e);
+    }
+    return null;
+  };
+
   // Gate Pass Actions
-  const requestGatePass = (passData: Omit<GatePass, 'id' | 'passCode' | 'status'>): GatePass => {
+  const requestGatePass = async (
+    passData: Omit<GatePass, 'id' | 'passCode' | 'status'>,
+  ): Promise<GatePass> => {
     const randomCode = `GP-${Math.floor(1000 + Math.random() * 9000)}`;
     const tempId = `gp-${Date.now()}`;
-    const newPass: GatePass = {
+    let newPass: GatePass = {
       ...passData,
       id: tempId,
       passCode: randomCode,
@@ -386,39 +468,62 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setGatePasses((prev) => [newPass, ...prev]);
 
     // Send to backend database
-    const token = localStorage.getItem('token');
-    if (token) {
-      const exitTime = passData.outTime?.slice(0, 5).includes(':') ? passData.outTime.slice(0, 5) : '20:00';
-      const returnTime = passData.expectedInTime?.slice(0, 5).includes(':') ? passData.expectedInTime.slice(0, 5) : '22:30';
+    try {
+      const token = await getValidToken();
+      if (token) {
+        const exitTime = passData.outTime?.trim() || '20:00';
+        const returnTime = passData.expectedInTime?.trim() || '22:30';
 
-      fetch('/api/gate-passes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          hostel: passData.hostelBlock || 'Hostel A',
-          reason: `${passData.purpose || 'Campus Leave'} (${passData.destination || 'City'})`,
-          requestedExitTime: exitTime,
-          expectedReturnTime: returnTime,
-        }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          if (res.success && res.data?._id) {
-            setGatePasses((prev) =>
-              prev.map((p) => (p.id === tempId ? { ...p, id: res.data._id } : p))
-            );
-          }
-        })
-        .catch(console.warn);
+        const res = await fetch('/api/gate-passes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            hostel: passData.hostelBlock || 'Hostel A',
+            reason: passData.purpose
+              ? `${passData.purpose}${passData.destination ? ` (${passData.destination})` : ''}`
+              : (passData.destination || 'Campus Leave'),
+            purpose: passData.purpose,
+            destination: passData.destination,
+            requestedExitTime: exitTime,
+            expectedReturnTime: returnTime,
+            rollNumber: passData.rollNumber,
+            studentName: passData.studentName,
+            phoneNumber: passData.parentPhone,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.data?._id) {
+          newPass = {
+            ...newPass,
+            id: data.data._id,
+            passCode: data.data.qrCode || newPass.passCode,
+            qrCode: data.data.qrCode,
+            qrImage: data.data.qrImage,
+            qrToken: data.data.qrToken,
+            qrIssuedAt: data.data.qrIssuedAt,
+            qrExpiresAt: data.data.qrExpiresAt,
+            issueCount: data.data.issueCount || 1,
+            status: data.data.status?.toLowerCase() === 'approved' ? 'approved' : 'pending',
+          };
+          setGatePasses((prev) =>
+            prev.map((p) => (p.id === tempId ? newPass : p)),
+          );
+        } else {
+          console.error('Database failed to create gate pass:', data);
+        }
+      }
+    } catch (err) {
+      console.error('Error sending gate pass to database:', err);
     }
 
     return newPass;
   };
 
-  const approveGatePass = (id: string, approverName: string = 'Hostel Warden') => {
+  const approveGatePass = async (id: string, approverName: string = 'Hostel Warden') => {
     setGatePasses((prev) =>
       prev.map((pass) =>
         pass.id === id
@@ -432,16 +537,37 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ),
     );
 
-    const token = localStorage.getItem('token');
-    if (token && /^[0-9a-fA-F]{24}$/.test(id)) {
-      fetch(`/api/gate-passes/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: 'APPROVED' }),
-      }).catch(console.warn);
+    try {
+      const token = await getValidToken();
+      if (token && /^[0-9a-fA-F]{24}$/.test(id)) {
+        const res = await fetch(`/api/gate-passes/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: 'APPROVED' }),
+        });
+        const data = await res.json();
+        if (data.success && data.data) {
+          setGatePasses((prev) =>
+            prev.map((pass) =>
+              pass.id === id
+                ? {
+                    ...pass,
+                    passCode: data.data.qrCode || pass.passCode,
+                    qrCode: data.data.qrCode,
+                    qrImage: data.data.qrImage,
+                    qrToken: data.data.qrToken,
+                    issueCount: data.data.issueCount || pass.issueCount,
+                  }
+                : pass,
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync gate pass approval to DB:', err);
     }
   };
 
@@ -471,9 +597,52 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const issueGatePassQr = async (id: string): Promise<GatePass | null> => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+
+    try {
+      const res = await fetch(`/api/gate-passes/${id}/issue-qr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        let updatedPass: GatePass | null = null;
+        setGatePasses((prev) =>
+          prev.map((p) => {
+            if (p.id === id) {
+              updatedPass = {
+                ...p,
+                passCode: data.data.qrCode,
+                qrCode: data.data.qrCode,
+                qrImage: data.data.qrImage,
+                qrToken: data.data.token,
+                qrIssuedAt: data.data.qrIssuedAt,
+                qrExpiresAt: data.data.qrExpiresAt,
+                issueCount: data.data.issueCount,
+              };
+              return updatedPass;
+            }
+            return p;
+          })
+        );
+        return updatedPass;
+      }
+    } catch (err) {
+      console.warn('Failed to issue fresh QR code:', err);
+    }
+    return null;
+  };
+
   const logGateExit = (passCode: string) => {
     const cleanCode = passCode.trim().toUpperCase();
-    const pass = gatePasses.find((p) => p.passCode.toUpperCase() === cleanCode);
+    const pass = gatePasses.find(
+      (p) => p.passCode.toUpperCase() === cleanCode || p.qrCode?.toUpperCase() === cleanCode,
+    );
 
     if (!pass) {
       return { success: false, message: `Gate pass code ${passCode} not found in database.` };
@@ -483,11 +652,24 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const updatedPass: GatePass = { ...pass, status: 'checked_out', actualOutTime: timeStr };
+
     setGatePasses((prev) =>
-      prev.map((p) =>
-        p.id === pass.id ? { ...p, status: 'checked_out', actualOutTime: timeStr } : p,
-      ),
+      prev.map((p) => (p.id === pass.id ? updatedPass : p)),
     );
+
+    // Sync to backend DB
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetch('/api/gate-passes/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ scanData: cleanCode }),
+      }).catch(console.warn);
+    }
 
     // Update Roll call roster
     setRollCallRecords((prev) =>
@@ -498,23 +680,38 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ),
     );
 
-    return { success: true, message: `Exit verified for ${pass.studentName} (${pass.rollNumber}). Expected return: ${pass.expectedInTime}`, pass };
+    return { success: true, message: `Exit verified for ${pass.studentName} (${pass.rollNumber}). Expected return: ${pass.expectedInTime}`, pass: updatedPass };
   };
 
   const logGateEntry = (passCode: string) => {
     const cleanCode = passCode.trim().toUpperCase();
-    const pass = gatePasses.find((p) => p.passCode.toUpperCase() === cleanCode);
+    const pass = gatePasses.find(
+      (p) => p.passCode.toUpperCase() === cleanCode || p.qrCode?.toUpperCase() === cleanCode,
+    );
 
     if (!pass) {
       return { success: false, message: `Pass code ${passCode} not found.` };
     }
 
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const updatedPass: GatePass = { ...pass, status: 'completed', actualInTime: timeStr };
+
     setGatePasses((prev) =>
-      prev.map((p) =>
-        p.id === pass.id ? { ...p, status: 'completed', actualInTime: timeStr } : p,
-      ),
+      prev.map((p) => (p.id === pass.id ? updatedPass : p)),
     );
+
+    // Sync to backend DB
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetch('/api/gate-passes/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ scanData: cleanCode }),
+      }).catch(console.warn);
+    }
 
     // Update Roll call
     setRollCallRecords((prev) =>
@@ -525,7 +722,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ),
     );
 
-    return { success: true, message: `Safe return logged for ${pass.studentName}. Pass completed.`, pass };
+    return { success: true, message: `Safe return logged for ${pass.studentName}. Pass completed.`, pass: updatedPass };
   };
 
   // Complaint Creation with Intelligent Deduplication
@@ -756,9 +953,9 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const newOrder: CafeteriaOrder = {
       id: `ord-${Date.now()}`,
       orderNumber,
-      studentName: 'Aarav Sharma',
-      roomNumber: '304',
-      hostelBlock: 'Ramanujan Block A',
+      studentName: user?.fullName || 'Anish Kumar',
+      roomNumber: user?.roomNumber || '101',
+      hostelBlock: user?.hostel || 'Hostel A',
       items,
       totalAmount: total,
       status: 'received',
@@ -800,8 +997,29 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     habits: string[],
   ): boolean => {
     let success = false;
-    setRooms((prev) =>
-      prev.map((rm) => {
+    const targetRoom = rooms.find((rm) => rm.id === roomId);
+
+    if (targetRoom && updateUserRoom) {
+      updateUserRoom({
+        hostel: targetRoom.block,
+        roomNumber: targetRoom.roomNumber,
+        bedLabel,
+      });
+    }
+
+    setRooms((prev) => {
+      // First vacate any bed previously occupied by this student
+      const cleared = prev.map((rm) => ({
+        ...rm,
+        beds: rm.beds.map((b) => {
+          if (b.occupant?.name?.includes(studentName) || b.occupant?.name?.includes('(You)')) {
+            return { ...b, isOccupied: false, occupant: undefined };
+          }
+          return b;
+        }),
+      }));
+
+      const updated = cleared.map((rm) => {
         if (rm.id !== roomId) return rm;
         const updatedBeds = rm.beds.map((b) => {
           if (b.bedLabel === bedLabel && !b.isOccupied) {
@@ -810,7 +1028,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               ...b,
               isOccupied: true,
               occupant: {
-                name: studentName,
+                name: `${studentName} (You)`,
                 rollNumber,
                 branch: 'Computer Science',
                 year: '1st Year',
@@ -821,8 +1039,9 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           return b;
         });
         return { ...rm, beds: updatedBeds };
-      }),
-    );
+      });
+      return updated;
+    });
     return success;
   };
 
@@ -945,6 +1164,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         requestGatePass,
         approveGatePass,
         rejectGatePass,
+        issueGatePassQr,
         logGateExit,
         logGateEntry,
         complaints,

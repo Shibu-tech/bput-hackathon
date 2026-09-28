@@ -5,6 +5,7 @@ require('dotenv').config();
 const User = require('../models/User');
 const Location = require('../models/Location');
 const MessMenu = require('../models/MessMenu');
+const GatePass = require('../models/GatePass');
 
 const seedDatabase = async () => {
   try {
@@ -17,8 +18,9 @@ const seedDatabase = async () => {
     await User.deleteMany({});
     await Location.deleteMany({});
     await MessMenu.deleteMany({});
+    await GatePass.deleteMany({});
 
-    console.log('Existing data cleared');
+    console.log('Existing data cleared (including gate passes)');
 
     // Create Locations
     const locations = [

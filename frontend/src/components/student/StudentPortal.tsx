@@ -21,6 +21,7 @@ import {
   Building,
   User,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
 
@@ -30,6 +31,7 @@ export const StudentPortal: React.FC = () => {
     lowDataMode,
     gatePasses,
     requestGatePass,
+    issueGatePassQr,
     complaints,
     createComplaint,
     upvoteComplaint,
@@ -81,6 +83,19 @@ export const StudentPortal: React.FC = () => {
   const [habitTags, setHabitTags] = useState<string[]>(['Night Owl (Coding)', 'Clean Desk']);
   const [bookingSuccess, setBookingSuccess] = useState('');
 
+  // Random QR generation state
+  const [isGeneratingQr, setIsGeneratingQr] = useState(false);
+
+  const handleRefreshQr = async (passId: string) => {
+    if (!passId) return;
+    setIsGeneratingQr(true);
+    try {
+      await issueGatePassQr(passId);
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  };
+
   // Filter student passes for current logged-in student
   const myPasses = gatePasses.filter(
     (p) => p.rollNumber === studentRoll || p.studentName === studentDisplayName
@@ -91,9 +106,9 @@ export const StudentPortal: React.FC = () => {
     (c) => c.rollNumber === studentRoll || c.studentName === studentDisplayName
   );
 
-  const handleCreatePass = (e: React.FormEvent) => {
+  const handleCreatePass = async (e: React.FormEvent) => {
     e.preventDefault();
-    const created = requestGatePass({
+    const created = await requestGatePass({
       studentName: studentDisplayName,
       rollNumber: studentRoll,
       roomNumber: user?.roomNumber || '101',
@@ -167,20 +182,24 @@ export const StudentPortal: React.FC = () => {
     const total = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
     const newOrder = placeCafeteriaOrder(items, total);
     setCart({});
-    setOrderSuccess(`Order placed! Delivery to Room 304. OTP: ${newOrder.deliveryOtp}`);
+    const assignedRoom = user?.roomNumber || '101';
+    setOrderSuccess(`Order placed! Delivery to Room ${assignedRoom}. OTP: ${newOrder.deliveryOtp}`);
     setTimeout(() => setOrderSuccess(null), 4000);
   };
 
   const handleConfirmRoomBooking = () => {
     if (!selectedRoomId || !selectedBedLabel) return;
+    const targetRoom = rooms.find((r) => r.id === selectedRoomId);
     const ok = bookBed(selectedRoomId, selectedBedLabel, studentDisplayName, studentRoll, habitTags);
     if (ok) {
-      setBookingSuccess(`Bed ${selectedBedLabel} confirmed! Roommate preferences registered.`);
+      setBookingSuccess(
+        `Room switched to ${targetRoom?.roomNumber || ''} (Bed ${selectedBedLabel}) in ${targetRoom?.block || ''}!`
+      );
       setTimeout(() => {
         setSelectedRoomId(null);
         setSelectedBedLabel(null);
         setBookingSuccess('');
-      }, 2000);
+      }, 2500);
     }
   };
 
@@ -198,7 +217,7 @@ export const StudentPortal: React.FC = () => {
               <span className="text-xs text-slate-500 font-mono">{studentRoll}</span>
             </div>
             <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-              <span>Hostel A · Room 101</span>
+              <span>{user?.hostel || 'Hostel A'} · Room {user?.roomNumber || '101'} (Bed {user?.bedLabel || 'A'})</span>
               <span aria-hidden="true">·</span>
               <span className="text-emerald-600 font-medium">Verified Student Account</span>
             </div>
@@ -255,30 +274,49 @@ export const StudentPortal: React.FC = () => {
             {activePass ? (
               <div className="space-y-4">
                 <div className="bg-slate-900 text-white rounded-xl p-5 text-center relative overflow-hidden shadow-sm">
-                  <div className="absolute top-2 right-2 text-2xs font-mono bg-white/20 px-2 py-0.5 rounded text-white">
-                    LIVE
-                  </div>
-                  <div className="text-2xs uppercase tracking-widest text-slate-300 font-semibold mb-1">
-                    {activePass.passType.replace('_', ' ')} PASS
-                  </div>
-                  <div className="text-2xl font-bold font-mono tracking-wider text-indigo-300">
-                    {activePass.passCode}
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className="text-2xs font-mono bg-indigo-500/30 border border-indigo-400/40 px-2 py-0.5 rounded text-indigo-200">
+                      Issue #{activePass.issueCount || 1}
+                    </span>
+                    <span className="text-2xs font-mono bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.5 rounded text-emerald-300 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE
+                    </span>
                   </div>
 
-                  {/* Dynamic QR Display (SVG Matrix simulation) */}
-                  <div className="my-4 mx-auto w-36 h-36 bg-white p-2.5 rounded-lg flex flex-col items-center justify-center shadow-inner">
-                    <div className="grid grid-cols-6 gap-1 w-full h-full p-1 bg-slate-900 rounded">
-                      {Array.from({ length: 36 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`rounded-xs ${
-                            (i * 7 + 3) % 2 === 0 || i === 0 || i === 5 || i === 30 || i === 35
-                              ? 'bg-white'
-                              : 'bg-transparent'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                  <div className="text-2xs uppercase tracking-widest text-slate-300 font-semibold mb-0.5">
+                    {activePass.passType.replace('_', ' ')} PASS
+                  </div>
+                  <div className="text-xl font-bold font-mono tracking-wider text-indigo-300">
+                    {activePass.qrCode || activePass.passCode}
+                  </div>
+
+                  {/* Real QR Display (Backend Generated Base64 Data URL) */}
+                  <div className="my-3 mx-auto w-40 h-40 bg-white p-2 rounded-xl flex flex-col items-center justify-center shadow-lg border border-slate-200 relative group">
+                    {activePass.qrImage ? (
+                      <img
+                        src={activePass.qrImage}
+                        alt="Gate Pass QR Code"
+                        className="w-full h-full object-contain rounded"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-6 gap-1 w-full h-full p-2 bg-slate-900 rounded items-center justify-center">
+                        <QrCode className="w-10 h-10 text-white animate-pulse mx-auto col-span-6" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Re-Issue Fresh Random QR Button */}
+                  <div className="flex justify-center mb-3">
+                    <button
+                      onClick={() => handleRefreshQr(activePass.id)}
+                      disabled={isGeneratingQr || activePass.status === 'completed' || activePass.status === 'rejected'}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-lg text-2xs font-medium cursor-pointer transition-all border border-white/20 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Issue a fresh, random QR code and update database"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isGeneratingQr ? 'animate-spin' : ''}`} />
+                      {isGeneratingQr ? 'Updating DB...' : 'Re-issue Fresh QR'}
+                    </button>
                   </div>
 
                   <div className="text-xs text-slate-200 font-medium">
@@ -409,7 +447,7 @@ export const StudentPortal: React.FC = () => {
                 </p>
               </div>
               <div className="text-xs text-indigo-600 font-medium bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">
-                Current Assigned: Room 304, Bed A (Ramanujan Block A)
+                Current Assigned: Room {user?.roomNumber || '101'}, Bed {user?.bedLabel || 'A'} ({user?.hostel || 'Hostel A'})
               </div>
             </div>
 
@@ -480,14 +518,17 @@ export const StudentPortal: React.FC = () => {
 
                           {bed.occupant ? (
                             <div className="mt-1.5 space-y-1">
-                              <div className="font-medium text-slate-900 truncate">
-                                {bed.occupant.name}
+                              <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                                <span>{studentDisplayName}</span>
+                                <span className="text-indigo-600 font-bold text-xs bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                  (You)
+                                </span>
                               </div>
                               <div className="text-2xs text-slate-500">
-                                {bed.occupant.branch} · {bed.occupant.year}
+                                {bed.occupant.branch || 'Computer Science'} · {bed.occupant.year || '1st Year'}
                               </div>
                               <div className="flex flex-wrap gap-1 pt-1">
-                                {bed.occupant.habits.map((h, i) => (
+                                {(bed.occupant.habits || habitTags).map((h, i) => (
                                   <span key={i} className="text-3xs bg-white/80 border border-slate-200 px-1 rounded text-slate-600">
                                     {h}
                                   </span>
@@ -723,7 +764,7 @@ export const StudentPortal: React.FC = () => {
                   </span>
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Delivered directly to Ramanujan Block A, Room 304 with secure OTP delivery handoff.
+                  Delivered directly to {user?.hostel || 'Hostel A'}, Room {user?.roomNumber || '101'} with secure OTP delivery handoff.
                 </p>
               </div>
 
@@ -1085,7 +1126,7 @@ export const StudentPortal: React.FC = () => {
                 </div>
 
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded text-slate-600 text-2xs flex items-center justify-between">
-                  <span>Location: Room 304 · Ramanujan Block A</span>
+                  <span>Location: Room {user?.roomNumber || '101'} · {user?.hostel || 'Hostel A'}</span>
                   <span className="text-indigo-600 font-semibold">Auto-routed to trade</span>
                 </div>
 

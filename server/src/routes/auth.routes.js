@@ -14,4 +14,7 @@ router.post('/login', validate(loginSchema, 'body'), authController.login);
 // GET /api/me
 router.get('/me', authenticate, authController.getMe);
 
+// PATCH /api/auth/room
+router.patch('/room', authenticate, authController.updateRoom);
+
 module.exports = router;

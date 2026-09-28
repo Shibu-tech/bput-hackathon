@@ -14,9 +14,15 @@ const userSchema = new mongoose.Schema({
   },
   phoneNumber: {
     type: String,
-    required: true,
+    required: [true, 'Phone number is required'],
     unique: true,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return /^\d{10}$/.test(v);
+      },
+      message: 'Phone number must be exactly 10 digits'
+    }
   },
   passwordHash: {
     type: String,
@@ -30,7 +36,14 @@ const userSchema = new mongoose.Schema({
   hostel: {
     type: String,
     enum: ['Hostel A', 'Hostel B', 'Hostel C'], // Adjust as needed
-    // Will be validated based on role in controller/service
+  },
+  roomNumber: {
+    type: String,
+    default: '101'
+  },
+  bedLabel: {
+    type: String,
+    default: 'A'
   },
   batch: {
     type: String,

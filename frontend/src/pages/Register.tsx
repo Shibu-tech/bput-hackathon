@@ -57,11 +57,27 @@ const Register: React.FC = () => {
       return;
     }
 
+    const cleanPhone = formData.phoneNumber.trim();
+    if (!cleanPhone) {
+      setError('Please enter your 10-digit phone number.');
+      return;
+    }
+
+    if (cleanPhone.includes('@') || /[a-zA-Z]/.test(cleanPhone)) {
+      setError('Email addresses and letters are not allowed. Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(cleanPhone)) {
+      setError('Phone number must be exactly 10 digits.');
+      return;
+    }
+
     setLoading(true);
     try {
       const userData: any = {
         fullName: formData.fullName.trim(),
-        phoneNumber: formData.phoneNumber.trim(),
+        phoneNumber: cleanPhone,
         password: formData.password,
         role: formData.role,
       };
@@ -93,6 +109,9 @@ const Register: React.FC = () => {
     }
   };
 
+  const isEmailOrLetter = formData.phoneNumber.includes('@') || /[a-zA-Z]/.test(formData.phoneNumber);
+  const isLengthInvalid = formData.phoneNumber.length > 0 && formData.phoneNumber.length !== 10 && !isEmailOrLetter;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
@@ -108,7 +127,7 @@ const Register: React.FC = () => {
           </p>
         </div>
 
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
           <div>
             <label htmlFor="fullName" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
               Full Name
@@ -126,19 +145,38 @@ const Register: React.FC = () => {
           </div>
 
           <div>
-            <label htmlFor="phoneNumber" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Phone Number (10 digits)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="phoneNumber" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Phone Number
+              </label>
+              <span className="text-[11px] text-slate-400 font-medium">Exactly 10 digits</span>
+            </div>
             <input
               id="phoneNumber"
               name="phoneNumber"
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
               required
-              className="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:border-indigo-600 focus:outline-none"
+              className={`block w-full rounded-lg border px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:outline-none transition-all ${
+                isEmailOrLetter
+                  ? 'border-red-400 focus:border-red-500'
+                  : 'border-slate-300 focus:border-indigo-600'
+              }`}
               placeholder="e.g. 9876543210"
               value={formData.phoneNumber}
               onChange={handleChange}
             />
+            {isEmailOrLetter && (
+              <p className="mt-1 text-xs text-red-600 font-medium">
+                Email addresses are not accepted. Please enter your 10-digit phone number.
+              </p>
+            )}
+            {isLengthInvalid && (
+              <p className="mt-1 text-xs text-amber-600 font-medium">
+                Phone number must be exactly 10 digits ({formData.phoneNumber.length}/10 entered)
+              </p>
+            )}
           </div>
 
           <div>
