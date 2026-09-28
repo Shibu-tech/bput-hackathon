@@ -1,13 +1,19 @@
-const jwt = require('./jwt');
+const {
+  signQrToken,
+  verifyQrToken,
+  generateRandomPassCode,
+  generateQrDataUrl,
+  issueRandomGatePassQr
+} = require('./qrGenerator');
 
 /**
  * Generate a short-lived token for gate pass QR code
  * @param {Object} payload - Data to encode in token (typically { passId })
- * @param {string} expiresIn - Expiration time (e.g., '15m', '1h')
+ * @param {string} expiresIn - Expiration time (e.g., '15m', '30m')
  * @returns {string} - Signed JWT token
  */
-const generateToken = (payload, expiresIn = '15m') => {
-  return jwt.generateToken(payload, expiresIn);
+const generateToken = (payload, expiresIn = '30m') => {
+  return signQrToken(payload, expiresIn);
 };
 
 /**
@@ -17,10 +23,13 @@ const generateToken = (payload, expiresIn = '15m') => {
  * @throws {Error} - If token is invalid
  */
 const verifyToken = (token) => {
-  return jwt.verifyToken(token);
+  return verifyQrToken(token);
 };
 
 module.exports = {
   generateToken,
-  verifyToken
+  verifyToken,
+  generateRandomPassCode,
+  generateQrDataUrl,
+  issueRandomGatePassQr
 };

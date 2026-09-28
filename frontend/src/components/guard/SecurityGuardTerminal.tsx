@@ -32,7 +32,12 @@ export const SecurityGuardTerminal: React.FC = () => {
 
   const handleSearchPass = (codeToSearch?: string) => {
     const code = (codeToSearch || passInput).trim().toUpperCase();
-    const found = gatePasses.find((p) => p.passCode.toUpperCase() === code);
+    const found = gatePasses.find(
+      (p) =>
+        p.passCode.toUpperCase() === code ||
+        p.qrCode?.toUpperCase() === code ||
+        p.id === code,
+    );
     if (found) {
       setSelectedPass(found);
       setFeedback(null);
@@ -43,7 +48,7 @@ export const SecurityGuardTerminal: React.FC = () => {
 
   const handleLogExit = () => {
     if (!selectedPass) return;
-    const res = logGateExit(selectedPass.passCode);
+    const res = logGateExit(selectedPass.qrCode || selectedPass.passCode);
     setFeedback(res);
     if (res.pass) {
       setSelectedPass(res.pass);
@@ -52,7 +57,7 @@ export const SecurityGuardTerminal: React.FC = () => {
 
   const handleLogEntry = () => {
     if (!selectedPass) return;
-    const res = logGateEntry(selectedPass.passCode);
+    const res = logGateEntry(selectedPass.qrCode || selectedPass.passCode);
     setFeedback(res);
     if (res.pass) {
       setSelectedPass(res.pass);
@@ -118,18 +123,21 @@ export const SecurityGuardTerminal: React.FC = () => {
             <div className="space-y-1.5 pt-2 border-t border-slate-100 text-2xs text-slate-500">
               <div className="font-semibold text-slate-700">Quick Test Scanner Codes:</div>
               <div className="flex flex-wrap gap-1.5">
-                {gatePasses.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setPassInput(p.passCode);
-                      handleSearchPass(p.passCode);
-                    }}
-                    className="px-2 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 font-mono rounded cursor-pointer transition-colors"
-                  >
-                    {p.passCode} ({p.studentName.split(' ')[0]})
-                  </button>
-                ))}
+                {gatePasses.map((p) => {
+                  const code = p.qrCode || p.passCode;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setPassInput(code);
+                        handleSearchPass(code);
+                      }}
+                      className="px-2 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 font-mono rounded cursor-pointer transition-colors"
+                    >
+                      {code} ({p.studentName.split(' ')[0]})
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -153,15 +161,32 @@ export const SecurityGuardTerminal: React.FC = () => {
           {selectedPass ? (
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
-                <div>
-                  <span className="text-2xs font-semibold uppercase tracking-wider text-slate-400">
-                    Student Gate Authorization
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <h2 className="text-lg font-bold text-slate-900">{selectedPass.studentName}</h2>
-                    <span className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                      {selectedPass.rollNumber}
+                <div className="flex items-center gap-3">
+                  {selectedPass.qrImage && (
+                    <img
+                      src={selectedPass.qrImage}
+                      alt="Pass QR"
+                      className="w-12 h-12 rounded-lg border border-slate-200 p-0.5 object-contain shadow-2xs bg-white"
+                    />
+                  )}
+                  <div>
+                    <span className="text-2xs font-semibold uppercase tracking-wider text-slate-400">
+                      Student Gate Authorization
                     </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <h2 className="text-lg font-bold text-slate-900">{selectedPass.studentName}</h2>
+                      <span className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                        {selectedPass.rollNumber}
+                      </span>
+                      <span className="text-xs font-mono bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-100">
+                        {selectedPass.qrCode || selectedPass.passCode}
+                      </span>
+                      {selectedPass.issueCount ? (
+                        <span className="text-2xs font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                          #{selectedPass.issueCount}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 

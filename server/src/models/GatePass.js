@@ -41,7 +41,46 @@ const gatePassSchema = new mongoose.Schema({
   },
   actualReturnTime: {
     type: Date
-  }
+  },
+  // Random QR Code and Issue Tracking
+  qrCode: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  qrImage: {
+    type: String
+  },
+  qrToken: {
+    type: String
+  },
+  qrIssuedAt: {
+    type: Date
+  },
+  qrExpiresAt: {
+    type: Date
+  },
+  issueCount: {
+    type: Number,
+    default: 0
+  },
+  issueHistory: [{
+    qrCode: {
+      type: String,
+      required: true
+    },
+    issuedAt: {
+      type: Date,
+      default: Date.now
+    },
+    issuedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    expiresAt: {
+      type: Date
+    }
+  }]
 }, {
   timestamps: true
 });

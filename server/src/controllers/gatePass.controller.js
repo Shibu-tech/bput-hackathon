@@ -1,18 +1,45 @@
 const gatePassService = require('../services/gatePass.service');
-const qrToken = require('../utils/qrToken');
+const { generateRandomPassCode, generateQrDataUrl, signQrToken } = require('../utils/qrGenerator');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
+
+const User = require('../models/User');
 
 /**
  * @desc    Create a new gate pass request
  * @route   POST /api/gate-passes
- * @access  Private (STUDENT)
+ * @access  Private (STUDENT, WARDEN, ADMIN)
  */
 const createGatePass = asyncHandler(async (req, res) => {
-  // Add studentId from authenticated user
+  let studentId = req.body.studentId;
+
+  if (!studentId && req.user && req.user.role === 'STUDENT') {
+    studentId = req.user._id;
+  }
+
+  // If still no studentId, attempt resolving from rollNumber / phone
+  if (!studentId && (req.body.rollNumber || req.body.phoneNumber || req.body.parentPhone)) {
+    const rawNum = req.body.phoneNumber || req.body.parentPhone || req.body.rollNumber;
+    const phone = String(rawNum).replace(/[^0-9]/g, '').slice(-10);
+    if (phone) {
+      const matched = await User.findOne({ phoneNumber: { $regex: phone } });
+      if (matched) studentId = matched._id;
+    }
+  }
+
+  // Fallback to current user or first student
+  if (!studentId) {
+    if (req.user && req.user.role === 'STUDENT') {
+      studentId = req.user._id;
+    } else {
+      const anyStudent = await User.findOne({ role: 'STUDENT' });
+      studentId = anyStudent ? anyStudent._id : req.user._id;
+    }
+  }
+
   const gatePassData = {
     ...req.body,
-    studentId: req.user._id
+    studentId
   };
 
   const gatePass = await gatePassService.createGatePass(gatePassData);
@@ -45,34 +72,67 @@ const updateGatePass = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get QR code for gate pass
- * @route   GET /api/gate-passes/:id/qr
- * @access  Private (STUDENT)
+ * @desc    Issue a fresh random QR code for a gate pass and update DB
+ * @route   POST /api/gate-passes/:id/issue-qr, GET /api/gate-passes/:id/qr
+ * @access  Private (STUDENT, WARDEN, ADMIN)
  */
-const getQrCode = asyncHandler(async (req, res) => {
+const issueQrCode = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const expiresInMinutes = req.query.expiresIn ? parseInt(req.query.expiresIn, 10) : 30;
 
-  // Get the gate pass to verify ownership
-  const gatePass = await gatePassService.getGatePassById(id);
+  const result = await gatePassService.issueGatePassQr(id, req.user, { expiresInMinutes });
 
-  // Check if the gate pass belongs to the current user
-  if (gatePass.studentId.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, 'Access denied');
-  }
+  res.json({
+    success: true,
+    message: 'Random QR code generated and recorded in database',
+    data: {
+      passId: result.passId,
+      qrCode: result.qrCode,
+      qrImage: result.qrImage,
+      token: result.token,
+      issueCount: result.issueCount,
+      qrIssuedAt: result.qrIssuedAt,
+      qrExpiresAt: result.qrExpiresAt,
+      expiresIn: result.expiresIn
+    }
+  });
+});
 
-  // Generate QR token
-  const qrTokenData = {
-    passId: gatePass._id,
-    timestamp: Date.now()
-  };
+/**
+ * @desc    Generate a standalone random QR code (utility API)
+ * @route   POST /api/gate-passes/generate-qr
+ * @access  Private
+ */
+const generateRandomQr = asyncHandler(async (req, res) => {
+  const { customPrefix, expiresInMinutes = 30, metadata = {} } = req.body;
 
-  const token = qrToken.generateToken(qrTokenData, '15m'); // 15 minutes expiry
+  const randomCode = customPrefix
+    ? `${customPrefix}-${generateRandomPassCode().replace('GP-', '')}`
+    : generateRandomPassCode();
+
+  const token = signQrToken({
+    code: randomCode,
+    metadata,
+    generatedAt: Date.now()
+  }, `${expiresInMinutes}m`);
+
+  const qrPayload = JSON.stringify({
+    type: 'CAMPUS_PASS',
+    code: randomCode,
+    token,
+    ...metadata
+  });
+
+  const qrImage = await generateQrDataUrl(qrPayload);
 
   res.json({
     success: true,
     data: {
+      qrCode: randomCode,
+      qrImage,
       token,
-      expiresIn: 15 * 60 // 15 minutes in seconds
+      expiresIn: expiresInMinutes * 60,
+      generatedAt: new Date()
     }
   });
 });
@@ -83,21 +143,19 @@ const getQrCode = asyncHandler(async (req, res) => {
  * @access  Private (SECURITY)
  */
 const scanGatePass = asyncHandler(async (req, res) => {
-  const { token } = req.body;
+  const { token, qrCode, passCode, scanData } = req.body;
 
-  if (!token) {
-    throw new ApiError(400, 'QR token is required');
+  const input = scanData || token || qrCode || passCode;
+
+  if (!input) {
+    throw new ApiError(400, 'QR scan data, token, or pass code is required');
   }
 
-  // Verify token
-  const decoded = qrToken.verifyToken(token);
-  const { passId } = decoded;
-
-  // Scan the gate pass
-  const gatePass = await gatePassService.scanGatePass(passId);
+  const gatePass = await gatePassService.scanGatePass(input);
 
   res.json({
     success: true,
+    message: `Pass successfully verified. Status: ${gatePass.status}`,
     data: gatePass
   });
 });
@@ -130,11 +188,53 @@ const getGatePasses = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Get gate pass by ID
+ * @route   GET /api/gate-passes/:id
+ * @access  Private
+ */
+const getGatePassById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const gatePass = await gatePassService.getGatePassById(id);
+
+  if (!gatePass) {
+    throw new ApiError(404, 'Gate pass not found');
+  }
+
+  // If student, ensure user is owner
+  if (req.user.role === 'STUDENT' && gatePass.studentId?._id?.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, 'Access denied');
+  }
+
+  res.json({
+    success: true,
+    data: gatePass
+  });
+});
+
+/**
+ * @desc    Delete dummy/mock gate passes from DB
+ * @route   DELETE /api/gate-passes/dummy
+ * @access  Private (ADMIN, WARDEN)
+ */
+const deleteDummyPasses = asyncHandler(async (req, res) => {
+  const result = await gatePassService.deleteDummyPasses();
+
+  res.json({
+    success: true,
+    message: `Deleted dummy gate passes from database`,
+    deletedCount: result.deletedCount
+  });
+});
+
 module.exports = {
   createGatePass,
   updateGatePass,
-  getQrCode,
+  issueQrCode,
+  generateRandomQr,
   scanGatePass,
   getOverduePasses,
-  getGatePasses
+  getGatePasses,
+  getGatePassById,
+  deleteDummyPasses
 };

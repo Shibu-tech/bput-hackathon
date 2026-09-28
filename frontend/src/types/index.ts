@@ -8,6 +8,12 @@ export type PassStatus = 'pending' | 'approved' | 'rejected' | 'checked_out' | '
 export interface GatePass {
   id: string;
   passCode: string;
+  qrCode?: string;
+  qrImage?: string;
+  qrToken?: string;
+  qrIssuedAt?: string;
+  qrExpiresAt?: string;
+  issueCount?: number;
   studentName: string;
   rollNumber: string;
   roomNumber: string;

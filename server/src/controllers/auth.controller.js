@@ -12,6 +12,11 @@ const { registerSchema } = require('../validators/auth.schema');
 const login = asyncHandler(async (req, res) => {
   const { phoneNumber, password } = req.body;
 
+  const trimmedPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+  if (!trimmedPhone || !/^\d{10}$/.test(trimmedPhone)) {
+    throw new ApiError(400, 'Phone number must be exactly 10 digits');
+  }
+
   // Find user by phone number
   const user = await User.findOne({ phoneNumber }).populate('locationId');
 
@@ -60,8 +65,13 @@ const register = asyncHandler(async (req, res) => {
   // Validate input
   const { fullName, phoneNumber, password, role, locationId, hostel, roomNumber, batch, shifts } = req.body;
 
+  const trimmedPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
+  if (!trimmedPhone || !/^\d{10}$/.test(trimmedPhone)) {
+    throw new ApiError(400, 'Phone number must be exactly 10 digits');
+  }
+
   // Check if user already exists
-  const existingUser = await User.findOne({ phoneNumber });
+  const existingUser = await User.findOne({ phoneNumber: trimmedPhone });
   if (existingUser) {
     throw new ApiError(400, 'User with this phone number already exists');
   }
@@ -137,8 +147,45 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Update student assigned room
+ * @route   PATCH /api/auth/room
+ * @access  Private
+ */
+const updateRoom = asyncHandler(async (req, res) => {
+  const { hostel, roomNumber, bedLabel } = req.body;
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  if (hostel) user.hostel = hostel;
+  if (roomNumber) user.roomNumber = roomNumber;
+  if (bedLabel) user.bedLabel = bedLabel;
+
+  await user.save();
+
+  const responseUser = {
+    id: user._id,
+    fullName: user.fullName,
+    role: user.role,
+    phoneNumber: user.phoneNumber,
+    hostel: user.hostel,
+    roomNumber: user.roomNumber,
+    bedLabel: user.bedLabel || 'A'
+  };
+
+  res.json({
+    success: true,
+    data: { user: responseUser },
+    user: responseUser
+  });
+});
+
 module.exports = {
   login,
   register,
-  getMe
+  getMe,
+  updateRoom
 };

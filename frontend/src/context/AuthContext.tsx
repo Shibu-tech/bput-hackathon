@@ -36,6 +36,7 @@ interface AuthContextType {
     phoneNumber: string;
     hostel?: string;
     roomNumber?: string;
+    bedLabel?: string;
     batch?: string;
   } | null;
 
@@ -46,7 +47,9 @@ interface AuthContextType {
   activeRole: UserRole;
   setActiveRole: (role: UserRole) => void;
 
-  login: (phoneNumber: string, password: string) => Promise<void>;
+  updateUserRoom: (roomData: { hostel: string; roomNumber: string; bedLabel: string }) => Promise<void>;
+
+  login: (phoneNumber: string, password: string, overrideRole?: UserRole) => Promise<void>;
 
   register: (userData: {
     fullName: string;
@@ -111,20 +114,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         setBackendRole(backendRoleFromData);
         const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
+        const storedRole = localStorage.getItem('active_role') as UserRole | null;
+        const validRoles: UserRole[] = ['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin'];
+        const resolvedRole = (storedRole && validRoles.includes(storedRole)) ? storedRole : frontendRole;
+
+        const storedRoom = localStorage.getItem('student_assigned_room');
+        let parsedRoom: { hostel?: string; roomNumber?: string; bedLabel?: string } | null = null;
+        if (storedRoom) {
+          try {
+            parsedRoom = JSON.parse(storedRoom);
+          } catch {}
+        }
+
+        const userHostel = parsedRoom?.hostel || rawUser.hostel || rawUser.locationId?.buildingName || 'Hostel A';
+        const userRoom = parsedRoom?.roomNumber || rawUser.roomNumber || rawUser.locationId?.roomNumber || '101';
+        const userBed = parsedRoom?.bedLabel || rawUser.bedLabel || 'A';
 
         setUser({
           id: rawUser.id || rawUser._id,
           fullName: rawUser.fullName,
-          role: frontendRole,
+          role: resolvedRole,
           phoneNumber: rawUser.phoneNumber,
-          hostel: rawUser.hostel || rawUser.locationId?.buildingName,
-          roomNumber: rawUser.roomNumber || rawUser.locationId?.roomNumber,
+          hostel: userHostel,
+          roomNumber: userRoom,
+          bedLabel: userBed,
           batch: rawUser.batch,
         });
-        setActiveRoleState(frontendRole);
+        setActiveRoleState(resolvedRole);
       } catch (err) {
         console.error('Auth error:', err);
         localStorage.removeItem('token');
+        localStorage.removeItem('active_role');
         setToken(null);
         setUser(null);
         setBackendRole(null);
@@ -140,7 +160,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Login
   const login = async (
     phoneNumber: string,
-    password: string
+    password: string,
+    overrideRole?: UserRole
   ): Promise<void> => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -155,9 +176,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || 'Login failed'
-      );
+      const detailedMsg =
+        (Array.isArray(errorData.errors) && errorData.errors[0]?.message) ||
+        errorData.message ||
+        'Login failed';
+      throw new Error(detailedMsg);
     }
 
     const data = await res.json();
@@ -172,17 +195,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const backendRoleFromData = rawUser.role;
     setBackendRole(backendRoleFromData);
     const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
+    const resolvedRole = overrideRole || frontendRole;
+
+    localStorage.setItem('active_role', resolvedRole);
+
+    const storedRoom = localStorage.getItem('student_assigned_room');
+    let parsedRoom: { hostel?: string; roomNumber?: string; bedLabel?: string } | null = null;
+    if (storedRoom) {
+      try {
+        parsedRoom = JSON.parse(storedRoom);
+      } catch {}
+    }
+
+    const userHostel = parsedRoom?.hostel || rawUser.hostel || rawUser.locationId?.buildingName || 'Hostel A';
+    const userRoom = parsedRoom?.roomNumber || rawUser.roomNumber || rawUser.locationId?.roomNumber || '101';
+    const userBed = parsedRoom?.bedLabel || rawUser.bedLabel || 'A';
 
     setUser({
       id: rawUser.id || rawUser._id,
       fullName: rawUser.fullName,
-      role: frontendRole,
+      role: resolvedRole,
       phoneNumber: rawUser.phoneNumber,
-      hostel: rawUser.hostel || rawUser.locationId?.buildingName,
-      roomNumber: rawUser.roomNumber || rawUser.locationId?.roomNumber,
+      hostel: userHostel,
+      roomNumber: userRoom,
+      bedLabel: userBed,
       batch: rawUser.batch,
     });
-    setActiveRoleState(frontendRole);
+    setActiveRoleState(resolvedRole);
+  };
+
+  // Update User Assigned Room
+  const updateUserRoom = async (roomData: { hostel: string; roomNumber: string; bedLabel: string }) => {
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            hostel: roomData.hostel,
+            roomNumber: roomData.roomNumber,
+            bedLabel: roomData.bedLabel,
+          }
+        : null
+    );
+
+    localStorage.setItem('student_assigned_room', JSON.stringify(roomData));
+
+    const currentToken = token || localStorage.getItem('token');
+    if (currentToken) {
+      try {
+        await fetch('/api/auth/room', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${currentToken}`,
+          },
+          body: JSON.stringify(roomData),
+        });
+      } catch (err) {
+        console.warn('Could not sync room update to server:', err);
+      }
+    }
   };
 
   // Register
@@ -206,9 +277,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || 'Registration failed'
-      );
+      const detailedMsg =
+        (Array.isArray(errorData.errors) && errorData.errors[0]?.message) ||
+        errorData.message ||
+        'Registration failed';
+      throw new Error(detailedMsg);
     }
 
     const data = await res.json();
@@ -232,15 +305,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         phoneNumber: rawUser.phoneNumber,
         hostel: rawUser.hostel || userData.hostel,
         roomNumber: rawUser.roomNumber,
+        bedLabel: rawUser.bedLabel || 'A',
         batch: rawUser.batch || userData.batch,
       });
     }
     setActiveRoleState(frontendRole);
   };
 
+  const setActiveRole = (newRole: UserRole) => {
+    localStorage.setItem('active_role', newRole);
+    setActiveRoleState(newRole);
+    if (user) {
+      setUser((prev) => (prev ? { ...prev, role: newRole } : null));
+    }
+  };
+
   // Logout
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('active_role');
+    localStorage.removeItem('student_assigned_room');
     setToken(null);
     setUser(null);
     setBackendRole(null);
@@ -255,7 +339,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         token,
         loading,
         activeRole,
-        setActiveRole: setActiveRoleState,
+        setActiveRole,
+        updateUserRoom,
         login,
         register,
         logout,
