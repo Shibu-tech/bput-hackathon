@@ -41,10 +41,9 @@ export const AdminPortal: React.FC = () => {
 
   const totalBroadcasts = broadcasts.length;
 
-  const totalCafeteriaOrders = cafeteriaOrders.reduce(
-    (sum, order) => sum + order.totalAmount,
-    0
-  );
+  const totalCafeteriaOrders = cafeteriaOrders
+    .filter((order) => order.status !== 'cancelled')
+    .reduce((sum, order) => sum + order.totalAmount, 0);
 
   // Active tab state
   const [activeTab, setActiveTab] = useState<

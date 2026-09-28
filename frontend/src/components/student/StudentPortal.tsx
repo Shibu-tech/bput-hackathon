@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { useAuth } from '../../context/AuthContext';
 import { translations } from '../../utils/translations';
-import { PassType, ComplaintCategory, ComplaintPriority } from '../../types';
+import { PassType, ComplaintCategory, ComplaintPriority, CafeteriaOrder, CafeteriaItem } from '../../types';
 import {
   QrCode,
   DoorClosed,
@@ -21,7 +21,7 @@ import {
   Building,
   User,
   Sparkles,
-  RefreshCw,
+  XCircle,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
 
@@ -39,7 +39,10 @@ export const StudentPortal: React.FC = () => {
     rateMealItem,
     mealRatings,
     cafeteriaOrders,
+    cafeteriaMenu,
     placeCafeteriaOrder,
+    cancelCafeteriaOrder,
+    submitOrderReview,
     rooms,
     bookBed,
   } = useCampusOps();
@@ -70,12 +73,54 @@ export const StudentPortal: React.FC = () => {
   // Cafeteria Ordering State
   const [cart, setCart] = useState<{ [itemId: string]: number }>({});
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
+  const [reviewingOrderId, setReviewingOrderId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewText, setReviewText] = useState<string>('');
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const { user } = useAuth();
   const studentDisplayName = user?.fullName || 'Student';
   const studentRoll = user?.phoneNumber ? `STU-${user.phoneNumber.slice(-4)}` : 'STU-1001';
   const studentPhone = user?.phoneNumber || '+91 98451 22910';
   const studentInitials = studentDisplayName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || 'ST';
+
+  // Check if student has a booked room in the campus hostel rooms
+  const myBookedRoom = rooms.find((r) =>
+    r.beds.some(
+      (b) =>
+        b.occupant?.name?.trim().toLowerCase() === studentDisplayName.trim().toLowerCase() ||
+        (b.occupant?.rollNumber && b.occupant.rollNumber === studentRoll)
+    )
+  );
+
+  const defaultRoomNumber = user?.roomNumber || myBookedRoom?.roomNumber || '101';
+  const defaultHostelBlock = user?.hostel || myBookedRoom?.block || 'Hostel A';
+
+  // Delivery destination state (synchronized with student's logged in room/hostel)
+  const [deliveryRoom, setDeliveryRoom] = useState<string>(defaultRoomNumber);
+  const [deliveryHostel, setDeliveryHostel] = useState<string>(defaultHostelBlock);
+
+  useEffect(() => {
+    if (user?.roomNumber) {
+      setDeliveryRoom(user.roomNumber);
+    } else if (myBookedRoom?.roomNumber) {
+      setDeliveryRoom(myBookedRoom.roomNumber);
+    }
+    if (user?.hostel) {
+      setDeliveryHostel(user.hostel);
+    } else if (myBookedRoom?.block) {
+      setDeliveryHostel(myBookedRoom.block);
+    }
+  }, [user?.roomNumber, user?.hostel, myBookedRoom?.roomNumber, myBookedRoom?.block]);
 
   // Roommate preferences for booking
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -111,8 +156,8 @@ export const StudentPortal: React.FC = () => {
     const created = await requestGatePass({
       studentName: studentDisplayName,
       rollNumber: studentRoll,
-      roomNumber: user?.roomNumber || '101',
-      hostelBlock: user?.hostel || 'Hostel A',
+      roomNumber: user?.roomNumber || deliveryRoom || '101',
+      hostelBlock: user?.hostel || deliveryHostel || 'Hostel A',
       passType,
       purpose,
       destination,
@@ -138,8 +183,8 @@ export const StudentPortal: React.FC = () => {
       description: complaintDesc || 'Direct complaint logged from hostel room.',
       studentName: studentDisplayName,
       rollNumber: studentRoll,
-      roomNumber: user?.roomNumber || '101',
-      hostelBlock: user?.hostel || 'Hostel A',
+      roomNumber: user?.roomNumber || deliveryRoom || '101',
+      hostelBlock: user?.hostel || deliveryHostel || 'Hostel A',
       priority: complaintPriority,
     });
 
@@ -153,6 +198,8 @@ export const StudentPortal: React.FC = () => {
   };
 
   const handleAddToCart = (itemId: string) => {
+    const item = cafeteriaMenu.find((i) => i.id === itemId);
+    if (!item || !item.available) return;
     setCart((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
   };
 
@@ -168,23 +215,94 @@ export const StudentPortal: React.FC = () => {
     });
   };
 
+  const getOrderPlacementTimestamp = (order: CafeteriaOrder) => {
+    if (order.createdAt) return order.createdAt;
+    if (order.id && order.id.startsWith('ord-')) {
+      const parsed = parseInt(order.id.replace('ord-', ''), 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  };
+
+  const getOrderCancellationInfo = (order: CafeteriaOrder) => {
+    const placedTime = getOrderPlacementTimestamp(order);
+    const elapsedSeconds = Math.max(0, Math.floor((currentTime - placedTime) / 1000));
+    const remainingSeconds = Math.max(0, 120 - elapsedSeconds);
+    const canCancel = order.status === 'received' && remainingSeconds > 0;
+    const mins = Math.floor(remainingSeconds / 60);
+    const secs = remainingSeconds % 60;
+    const formattedTime = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return { elapsedSeconds, remainingSeconds, canCancel, formattedTime };
+  };
+
+  const cartTotalAmount = Object.entries(cart).reduce((sum, [itemId, qty]) => {
+    const food = cafeteriaMenu.find((f) => f.id === itemId);
+    return sum + (food && food.available ? food.price * qty : 0);
+  }, 0);
+
+  const cartTotalCount = Object.entries(cart).reduce((acc, [itemId, qty]) => {
+    const food = cafeteriaMenu.find((f) => f.id === itemId);
+    return acc + (food && food.available ? qty : 0);
+  }, 0);
+
+  // Filter cafeteria orders for this student so they only see their own orders
+  const myCafeteriaOrders = cafeteriaOrders.filter(
+    (o) =>
+      !o.studentName ||
+      o.studentName.trim().toLowerCase() === studentDisplayName.trim().toLowerCase() ||
+      o.studentName === 'Student' ||
+      studentDisplayName === 'Student'
+  );
+
+  const activeCancellableOrder = myCafeteriaOrders.find((o) => {
+    if (o.status !== 'received') return false;
+    const { canCancel } = getOrderCancellationInfo(o);
+    return canCancel;
+  });
+
   const handlePlaceOrder = () => {
-    const items = Object.entries(cart).map(([itemId, qty]) => {
-      const item = [
-        { id: 'c-1', name: 'Paneer Tikka Kathi Roll', price: 90, category: 'quick_bites' as const, veg: true, prepTimeMinutes: 15, available: true },
-        { id: 'c-3', name: 'Cheese Maggi Noodles with Veggies', price: 65, category: 'snacks' as const, veg: true, prepTimeMinutes: 10, available: true },
-        { id: 'c-4', name: 'Iced Cold Coffee with Vanilla Scoop', price: 75, category: 'beverages' as const, veg: true, prepTimeMinutes: 5, available: true },
-        { id: 'c-6', name: 'Midnight Veg Biryani Bowl', price: 130, category: 'meals' as const, veg: true, prepTimeMinutes: 20, available: true },
-      ].find((i) => i.id === itemId)!;
-      return { item, quantity: qty };
-    });
+    const items = Object.entries(cart)
+      .map(([itemId, qty]) => {
+        const item = cafeteriaMenu.find((i) => i.id === itemId);
+        return item && item.available ? { item, quantity: qty } : null;
+      })
+      .filter(Boolean) as { item: CafeteriaItem; quantity: number }[];
+
+    if (items.length === 0) return;
 
     const total = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
-    const newOrder = placeCafeteriaOrder(items, total);
+    const targetRoom = deliveryRoom.trim() || defaultRoomNumber;
+    const targetHostel = deliveryHostel.trim() || defaultHostelBlock;
+
+    const newOrder = placeCafeteriaOrder(items, total, {
+      studentName: studentDisplayName,
+      roomNumber: targetRoom,
+      hostelBlock: targetHostel,
+    });
     setCart({});
-    const assignedRoom = user?.roomNumber || '101';
-    setOrderSuccess(`Order placed! Delivery to Room ${assignedRoom}. OTP: ${newOrder.deliveryOtp}`);
-    setTimeout(() => setOrderSuccess(null), 4000);
+    setOrderSuccess(
+      `Order ${newOrder.orderNumber} placed for ${newOrder.studentName}! Delivering to Room ${newOrder.roomNumber} (${newOrder.hostelBlock}) · OTP: ${newOrder.deliveryOtp}`
+    );
+    setTimeout(() => setOrderSuccess(null), 6000);
+  };
+
+  const handleCancelOrder = (orderId: string) => {
+    cancelCafeteriaOrder(orderId);
+    setCancelSuccess('Your order has been cancelled successfully. No charges will be deducted.');
+    setTimeout(() => setCancelSuccess(null), 5000);
+  };
+
+  const handleOpenReview = (order: CafeteriaOrder) => {
+    setReviewingOrderId(order.id);
+    setReviewRating(order.rating || 5);
+    setReviewText(order.review || '');
+  };
+
+  const handleSubmitReview = (orderId: string) => {
+    submitOrderReview(orderId, reviewRating, reviewText);
+    setReviewingOrderId(null);
+    setReviewSuccess('Thank you for rating your food! Feedback submitted to mess & cafeteria kitchen staff.');
+    setTimeout(() => setReviewSuccess(null), 5000);
   };
 
   const handleConfirmRoomBooking = () => {
@@ -217,7 +335,7 @@ export const StudentPortal: React.FC = () => {
               <span className="text-xs text-slate-500 font-mono">{studentRoll}</span>
             </div>
             <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-              <span>{user?.hostel || 'Hostel A'} · Room {user?.roomNumber || '101'} (Bed {user?.bedLabel || 'A'})</span>
+              <span>{deliveryHostel} · Room {deliveryRoom}</span>
               <span aria-hidden="true">·</span>
               <span className="text-emerald-600 font-medium">Verified Student Account</span>
             </div>
@@ -447,7 +565,7 @@ export const StudentPortal: React.FC = () => {
                 </p>
               </div>
               <div className="text-xs text-indigo-600 font-medium bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">
-                Current Assigned: Room {user?.roomNumber || '101'}, Bed {user?.bedLabel || 'A'} ({user?.hostel || 'Hostel A'})
+                Current Assigned: {deliveryHostel}, Room {deliveryRoom}
               </div>
             </div>
 
@@ -755,7 +873,7 @@ export const StudentPortal: React.FC = () => {
 
           {/* In-Room Cafeteria Delivery (Commercial food app experience) */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
                 <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span>Midnight & In-Room Cafeteria Delivery</span>
@@ -763,65 +881,170 @@ export const StudentPortal: React.FC = () => {
                     Open till 02:00 AM
                   </span>
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Delivered directly to {user?.hostel || 'Hostel A'}, Room {user?.roomNumber || '101'} with secure OTP delivery handoff.
-                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+                  <span>Delivered directly to:</span>
+                  <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    👤 {studentDisplayName}
+                  </span>
+                  <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    🏢 {deliveryHostel} · Room {deliveryRoom}
+                  </span>
+                </div>
               </div>
 
-              {Object.keys(cart).length > 0 && (
-                <button
-                  onClick={handlePlaceOrder}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm cursor-pointer flex items-center gap-1.5"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                  Place Delivery Order ({Object.values(cart).reduce((a, b) => a + b, 0)} items)
-                </button>
+              {cartTotalCount > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-2xs text-slate-500 font-semibold block uppercase tracking-wide">
+                      Total Bill
+                    </span>
+                    <span className="font-mono font-extrabold text-sm text-slate-900">
+                      ₹{cartTotalAmount}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handlePlaceOrder}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm cursor-pointer flex items-center gap-1.5 transition-all"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    Place Delivery Order ({cartTotalCount} items)
+                  </button>
+                </div>
               )}
             </div>
 
+            {/* Active 2-Minute Cancellation Alert Banner */}
+            {activeCancellableOrder && (() => {
+              const { formattedTime } = getOrderCancellationInfo(activeCancellableOrder);
+              return (
+                <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl text-xs space-y-2 shadow-xs animate-in fade-in duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 bg-amber-100 rounded-lg text-amber-700 shrink-0 mt-0.5">
+                        <Clock className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">
+                            Order Placed: {activeCancellableOrder.orderNumber}
+                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-xs font-mono border border-emerald-300 shadow-2xs">
+                            Total Bill: ₹{activeCancellableOrder.totalAmount}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 mt-1 text-2xs">
+                          Delivering to <strong>{activeCancellableOrder.studentName}</strong> · Room <strong>{activeCancellableOrder.roomNumber}</strong> ({activeCancellableOrder.hostelBlock}) · Handoff OTP: <strong className="font-mono text-indigo-700">{activeCancellableOrder.deliveryOtp}</strong>
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-amber-900 font-medium text-xs">
+                          <span>
+                            ⚠️ You can cancel your order if you want within <strong>2 minutes</strong>. Cancellation timer:
+                          </span>
+                          <span className="font-mono font-extrabold text-xs text-rose-700 bg-white px-2 py-0.5 rounded-md border border-amber-300 shadow-2xs">
+                            ⏱️ {formattedTime}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleCancelOrder(activeCancellableOrder.id)}
+                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Cancel Order
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {cancelSuccess && (
+              <div className="p-3 bg-rose-50 text-rose-800 text-xs font-semibold rounded-lg border border-rose-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{cancelSuccess}</span>
+              </div>
+            )}
+
+            {reviewSuccess && (
+              <div className="p-3 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{reviewSuccess}</span>
+              </div>
+            )}
+
             {orderSuccess && (
-              <div className="p-3 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200">
-                {orderSuccess}
+              <div className="p-3 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{orderSuccess}</span>
               </div>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { id: 'c-1', name: 'Paneer Tikka Kathi Roll', price: 90, prep: '15m', tag: 'Chef Special' },
-                { id: 'c-3', name: 'Cheese Maggi Noodles', price: 65, prep: '10m', tag: 'Midnight Favorite' },
-                { id: 'c-4', name: 'Iced Cold Coffee with Scoop', price: 75, prep: '5m', tag: 'Chilled' },
-                { id: 'c-6', name: 'Midnight Veg Biryani Bowl', price: 130, prep: '20m', tag: 'Filling' },
-              ].map((food) => {
+              {cafeteriaMenu.map((food) => {
                 const count = cart[food.id] || 0;
+                const isOutOfStock = !food.available;
                 return (
-                  <div key={food.id} className="border border-slate-200 rounded-lg p-3 bg-white space-y-2">
+                  <div
+                    key={food.id}
+                    className={`border rounded-lg p-3 space-y-2 transition-all ${
+                      isOutOfStock
+                        ? 'border-slate-200 bg-slate-50/80 opacity-80'
+                        : 'border-slate-200 rounded-lg bg-white shadow-2xs hover:border-slate-300'
+                    }`}
+                  >
                     <div className="flex items-center justify-between text-2xs text-slate-500">
-                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-medium">
-                        {food.tag}
-                      </span>
-                      <span>{food.prep}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            food.veg ? 'bg-emerald-500' : 'bg-rose-500'
+                          }`}
+                          title={food.veg ? 'Pure Veg' : 'Non-Veg'}
+                        />
+                        {food.tag && (
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-medium">
+                            {food.tag}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {isOutOfStock ? (
+                          <span className="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-bold text-3xs uppercase tracking-wider">
+                            Stock Out
+                          </span>
+                        ) : (
+                          <span>{food.prepTimeMinutes ? `${food.prepTimeMinutes}m` : '10m'}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="font-semibold text-xs text-slate-900">{food.name}</div>
+                    <div className="font-semibold text-xs text-slate-900 leading-snug">{food.name}</div>
                     <div className="flex items-center justify-between pt-1">
                       <span className="font-mono text-xs font-bold text-slate-900">₹{food.price}</span>
                       <div className="flex items-center gap-1.5">
-                        {count > 0 && (
+                        {isOutOfStock ? (
+                          <span className="px-2.5 py-1 rounded bg-slate-200 text-slate-500 text-2xs font-semibold cursor-not-allowed select-none">
+                            Sold Out
+                          </span>
+                        ) : (
                           <>
+                            {count > 0 && (
+                              <>
+                                <button
+                                  onClick={() => handleRemoveFromCart(food.id)}
+                                  className="w-6 h-6 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center justify-center text-xs font-bold cursor-pointer transition-colors"
+                                >
+                                  -
+                                </button>
+                                <span className="text-xs font-mono font-medium px-1">{count}</span>
+                              </>
+                            )}
                             <button
-                              onClick={() => handleRemoveFromCart(food.id)}
-                              className="w-6 h-6 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center justify-center text-xs font-bold cursor-pointer"
+                              onClick={() => handleAddToCart(food.id)}
+                              className="px-2.5 py-1 rounded bg-slate-900 text-white hover:bg-slate-800 text-xs font-semibold cursor-pointer transition-colors"
                             >
-                              -
+                              + Add
                             </button>
-                            <span className="text-xs font-mono font-medium px-1">{count}</span>
                           </>
                         )}
-                        <button
-                          onClick={() => handleAddToCart(food.id)}
-                          className="px-2.5 py-1 rounded bg-slate-900 text-white hover:bg-slate-800 text-xs font-semibold cursor-pointer"
-                        >
-                          + Add
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -832,30 +1055,277 @@ export const StudentPortal: React.FC = () => {
             {/* Active Delivery Orders */}
             <div className="pt-2">
               <h3 className="text-xs font-bold text-slate-700 mb-2">Live In-Room Delivery Orders</h3>
-              <div className="space-y-2">
-                {cafeteriaOrders.map((o) => (
-                  <div key={o.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-900">{o.orderNumber}</span>
-                        <span className="text-2xs font-semibold uppercase bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">
-                          {o.status.replace('_', ' ')}
-                        </span>
-                        <span className="text-slate-500">Room {o.roomNumber} ({o.hostelBlock})</span>
+              {myCafeteriaOrders.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-2">
+                  No delivery orders placed yet. Choose any late-night snack above to place an order.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {myCafeteriaOrders.map((o) => {
+                    const { remainingSeconds, canCancel, formattedTime } = getOrderCancellationInfo(o);
+                    return (
+                      <div
+                        key={o.id}
+                        className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-xs shadow-2xs"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-slate-900 text-xs">{o.orderNumber}</span>
+                            <span
+                              className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded border ${
+                                o.status === 'cancelled'
+                                  ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                  : o.status === 'delivered'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  : o.status === 'out_for_delivery'
+                                  ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                  : o.status === 'preparing'
+                                  ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}
+                            >
+                              {o.status.replace('_', ' ')}
+                            </span>
+                            <span className="text-slate-800 font-semibold text-2xs">
+                              👤 {o.studentName}
+                            </span>
+                            <span className="text-slate-500 text-2xs">
+                              · Room {o.roomNumber} ({o.hostelBlock})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xs font-mono text-slate-400">Placed {o.placedAt}</span>
+                            <div className="text-right">
+                              <span className="text-3xs text-slate-500 uppercase tracking-wider block">Handoff OTP:</span>
+                              {o.status === 'cancelled' ? (
+                                <span className="font-mono text-xs text-slate-400 line-through">
+                                  {o.deliveryOtp}
+                                </span>
+                              ) : (
+                                <span className="font-mono font-bold text-sm text-indigo-600 tracking-wider">
+                                  {o.deliveryOtp}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Items & Bolder Emphasized Total Bill */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80">
+                          <div className="text-2xs text-slate-600">
+                            {o.items.map((it) => `${it.quantity}x ${it.item.name}`).join(', ')}
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-900 text-white px-2.5 py-1 rounded-md shadow-2xs">
+                            <span className="text-3xs text-slate-300 font-semibold uppercase tracking-wider">
+                              Total Bill:
+                            </span>
+                            <span className="font-mono font-extrabold text-sm text-emerald-400">
+                              ₹{o.totalAmount}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 2-Minute Cancellation Window & Cancel Button */}
+                        {canCancel && (
+                          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in duration-200">
+                            <div className="flex items-center gap-2 text-xs text-amber-900">
+                              <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
+                              <span>
+                                You can cancel your order if you want within <strong>2 minutes</strong>. Time remaining:
+                              </span>
+                              <span className="font-mono font-extrabold text-xs text-rose-700 bg-white px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs">
+                                ⏱️ {formattedTime}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleCancelOrder(o.id)}
+                              className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded shadow-xs cursor-pointer flex items-center justify-center gap-1 transition-colors shrink-0"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Cancel Order
+                            </button>
+                          </div>
+                        )}
+
+                        {/* When 2 minutes expire and order is received */}
+                        {!canCancel && o.status === 'received' && remainingSeconds === 0 && (
+                          <div className="text-3xs text-slate-400 font-medium">
+                            Cancellation window closed (2 min elapsed) · Order locked for kitchen prep
+                          </div>
+                        )}
+
+                        {/* When order is cancelled */}
+                        {o.status === 'cancelled' && (
+                          <div className="p-2 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-800 flex items-center gap-1.5 font-medium">
+                            <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <span>Order was cancelled by student within 2-minute cancellation window.</span>
+                          </div>
+                        )}
+
+                        {/* Delivered Order Food Rating & Review Option */}
+                        {o.status === 'delivered' && (
+                          <div className="pt-1">
+                            {reviewingOrderId === o.id ? (
+                              <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl space-y-3 shadow-2xs animate-in fade-in duration-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                                    <span>Rate Food & Cafeteria Delivery</span>
+                                  </div>
+                                  <button
+                                    onClick={() => setReviewingOrderId(null)}
+                                    className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+
+                                {/* Interactive Star Rating (1 to 5) */}
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                  <span className="text-2xs font-semibold text-slate-600">Your Rating:</span>
+                                  <div className="flex items-center gap-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button
+                                        key={star}
+                                        type="button"
+                                        onClick={() => setReviewRating(star)}
+                                        className="p-1 cursor-pointer transition-transform hover:scale-125 focus:outline-none"
+                                        title={`${star} Star${star > 1 ? 's' : ''}`}
+                                      >
+                                        <Star
+                                          className={`w-5 h-5 ${
+                                            star <= reviewRating
+                                              ? 'fill-amber-400 text-amber-400 drop-shadow-xs'
+                                              : 'text-slate-300 hover:text-amber-300'
+                                          }`}
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <span className="text-xs font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                                    {reviewRating === 5
+                                      ? '5.0 - Excellent! 🔥'
+                                      : reviewRating === 4
+                                      ? '4.0 - Very Good 👍'
+                                      : reviewRating === 3
+                                      ? '3.0 - Average 🙂'
+                                      : reviewRating === 2
+                                      ? '2.0 - Below Expectations 😕'
+                                      : '1.0 - Poor 😞'}
+                                  </span>
+                                </div>
+
+                                {/* Quick feedback chips */}
+                                <div className="flex flex-wrap gap-1.5">
+                                  {[
+                                    'Hot & Fresh 🔥',
+                                    'Super Fast ⚡',
+                                    'Tasty & Cheesy 😋',
+                                    'Crispy Kathi Roll 🌯',
+                                    'Chilled Drink 🥤',
+                                    'Well Packaged 📦',
+                                  ].map((chip) => (
+                                    <button
+                                      key={chip}
+                                      type="button"
+                                      onClick={() => {
+                                        if (!reviewText.includes(chip)) {
+                                          setReviewText((prev) => (prev ? `${prev} · ${chip}` : chip));
+                                        }
+                                      }}
+                                      className="text-3xs px-2 py-0.5 rounded-full bg-white border border-amber-200 text-slate-700 hover:bg-amber-100 cursor-pointer transition-colors"
+                                    >
+                                      + {chip}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* Review comments input */}
+                                <textarea
+                                  value={reviewText}
+                                  onChange={(e) => setReviewText(e.target.value)}
+                                  rows={2}
+                                  placeholder="Write a review about food taste, quality, temperature, or cafeteria service..."
+                                  className="w-full text-xs p-2.5 bg-white border border-amber-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-900 placeholder:text-slate-400 resize-none"
+                                />
+
+                                <div className="flex items-center justify-end gap-2 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setReviewingOrderId(null)}
+                                    className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 font-medium cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSubmitReview(o.id)}
+                                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+                                  >
+                                    <Star className="w-3.5 h-3.5 fill-white" />
+                                    Submit Review
+                                  </button>
+                                </div>
+                              </div>
+                            ) : o.rating ? (
+                              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex text-amber-500">
+                                      {Array.from({ length: 5 }).map((_, i) => (
+                                        <Star
+                                          key={i}
+                                          className={`w-3.5 h-3.5 ${
+                                            i < o.rating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
+                                          }`}
+                                        />
+                                      ))}
+                                    </div>
+                                    <span className="font-bold text-xs text-amber-950 font-mono">
+                                      {o.rating}.0 / 5.0
+                                    </span>
+                                    <span className="text-3xs bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-semibold border border-emerald-200">
+                                      ✓ Review Visible in Mess Portal
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleOpenReview(o)}
+                                    className="text-2xs text-amber-800 hover:underline font-semibold cursor-pointer"
+                                  >
+                                    Edit Review
+                                  </button>
+                                </div>
+                                {o.review && (
+                                  <p className="text-xs text-slate-700 italic bg-white p-2 rounded border border-amber-100">
+                                    "{o.review}"
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 text-xs text-indigo-950">
+                                  <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                                  <span>
+                                    Delivered! How was your late-night food? Leave a rating & review for the kitchen.
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleOpenReview(o)}
+                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+                                >
+                                  <Star className="w-3.5 h-3.5 fill-white" />
+                                  Rate & Review Food
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-2xs text-slate-500 mt-1">
-                        {o.items.map((it) => `${it.quantity}x ${it.item.name}`).join(', ')} · Total ₹{o.totalAmount}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xs text-slate-500">Handoff OTP:</div>
-                      <div className="font-mono font-bold text-sm text-indigo-600 tracking-wider">
-                        {o.deliveryOtp}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1126,7 +1596,7 @@ export const StudentPortal: React.FC = () => {
                 </div>
 
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded text-slate-600 text-2xs flex items-center justify-between">
-                  <span>Location: Room {user?.roomNumber || '101'} · {user?.hostel || 'Hostel A'}</span>
+                  <span>Location: Room {deliveryRoom} · {deliveryHostel}</span>
                   <span className="text-indigo-600 font-semibold">Auto-routed to trade</span>
                 </div>
 

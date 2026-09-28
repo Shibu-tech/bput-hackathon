@@ -46,15 +46,35 @@ export const dailyMessMenu: DailyMessMenu = {
 };
 
 export const cafeteriaItems: CafeteriaItem[] = [
-  { id: 'c-1', name: 'Paneer Tikka Kathi Roll', price: 90, category: 'quick_bites', veg: true, prepTimeMinutes: 15, available: true },
-  { id: 'c-2', name: 'Double Egg Chicken Roll', price: 120, category: 'quick_bites', veg: false, prepTimeMinutes: 15, available: true },
-  { id: 'c-3', name: 'Cheese Maggi Noodles with Veggies', price: 65, category: 'snacks', veg: true, prepTimeMinutes: 10, available: true },
-  { id: 'c-4', name: 'Iced Cold Coffee with Vanilla Scoop', price: 75, category: 'beverages', veg: true, prepTimeMinutes: 5, available: true },
-  { id: 'c-5', name: 'Grilled Corn & Cheese Sandwich', price: 80, category: 'snacks', veg: true, prepTimeMinutes: 12, available: true },
-  { id: 'c-6', name: 'Midnight Veg Biryani Bowl', price: 130, category: 'meals', veg: true, prepTimeMinutes: 20, available: true },
+  { id: 'c-1', name: 'Paneer Tikka Kathi Roll', price: 90, category: 'quick_bites', veg: true, prepTimeMinutes: 15, available: true, tag: 'Chef Special' },
+  { id: 'c-2', name: 'Double Egg Chicken Roll', price: 120, category: 'quick_bites', veg: false, prepTimeMinutes: 15, available: true, tag: 'Non-Veg Special' },
+  { id: 'c-3', name: 'Cheese Maggi Noodles with Veggies', price: 65, category: 'snacks', veg: true, prepTimeMinutes: 10, available: true, tag: 'Midnight Favorite' },
+  { id: 'c-4', name: 'Iced Cold Coffee with Vanilla Scoop', price: 75, category: 'beverages', veg: true, prepTimeMinutes: 5, available: true, tag: 'Chilled' },
+  { id: 'c-5', name: 'Grilled Corn & Cheese Sandwich', price: 80, category: 'snacks', veg: true, prepTimeMinutes: 12, available: true, tag: 'Crispy' },
+  { id: 'c-6', name: 'Midnight Veg Biryani Bowl', price: 130, category: 'meals', veg: true, prepTimeMinutes: 20, available: true, tag: 'Filling' },
 ];
 
-export const initialOrders: CafeteriaOrder[] = [];
+export const initialOrders: CafeteriaOrder[] = [
+  {
+    id: 'ord-1710000000001',
+    orderNumber: 'CF-4821',
+    studentName: 'Aarav Sharma',
+    roomNumber: '304',
+    hostelBlock: 'Ramanujan Block A',
+    items: [
+      { item: cafeteriaItems[0], quantity: 1 },
+      { item: cafeteriaItems[1], quantity: 1 },
+    ],
+    totalAmount: 155,
+    status: 'delivered',
+    placedAt: '23:15',
+    createdAt: Date.now() - 3600000,
+    deliveryOtp: '8492',
+    rating: 5,
+    review: 'Paneer roll was piping hot and Maggi was cheesy! Great late-night service.',
+    reviewedAt: '23:42',
+  },
+];
 
 export const hostelRooms: HostelRoom[] = [
   {

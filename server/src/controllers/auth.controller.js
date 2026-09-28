@@ -18,7 +18,7 @@ const login = asyncHandler(async (req, res) => {
   }
 
   // Find user by phone number
-  const user = await User.findOne({ phoneNumber: trimmedPhone });
+  const user = await User.findOne({ phoneNumber }).populate('locationId');
 
   if (!user) {
     throw new ApiError(401, 'Invalid credentials');
@@ -40,9 +40,9 @@ const login = asyncHandler(async (req, res) => {
     fullName: user.fullName,
     role: user.role,
     phoneNumber: user.phoneNumber,
-    hostel: user.hostel,
-    roomNumber: user.roomNumber,
-    bedLabel: user.bedLabel || 'A'
+    hostel: user.hostel || user.locationId?.buildingName || '',
+    roomNumber: user.roomNumber || user.locationId?.roomNumber || '',
+    batch: user.batch || ''
   };
 
   res.json({
@@ -63,7 +63,7 @@ const login = asyncHandler(async (req, res) => {
  */
 const register = asyncHandler(async (req, res) => {
   // Validate input
-  const { fullName, phoneNumber, password, role, locationId, hostel, batch, shifts } = req.body;
+  const { fullName, phoneNumber, password, role, locationId, hostel, roomNumber, batch, shifts } = req.body;
 
   const trimmedPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
   if (!trimmedPhone || !/^\d{10}$/.test(trimmedPhone)) {
@@ -88,6 +88,7 @@ const register = asyncHandler(async (req, res) => {
   if (role === 'STUDENT') {
     if (locationId && require('mongoose').Types.ObjectId.isValid(locationId)) userData.locationId = locationId;
     if (hostel) userData.hostel = hostel;
+    if (roomNumber) userData.roomNumber = roomNumber;
     if (batch) userData.batch = batch;
   } else if (role === 'TECHNICIAN') {
     if (shifts && Array.isArray(shifts) && shifts.length > 0) userData.shifts = shifts;
@@ -97,6 +98,7 @@ const register = asyncHandler(async (req, res) => {
 
   // Create user
   const user = await User.create(userData);
+  const populatedUser = await User.findById(user._id).populate('locationId');
 
   // Generate token
   const token = jwt.generateToken({ userId: user._id });
@@ -105,7 +107,10 @@ const register = asyncHandler(async (req, res) => {
     id: user._id,
     fullName: user.fullName,
     role: user.role,
-    phoneNumber: user.phoneNumber
+    phoneNumber: user.phoneNumber,
+    hostel: user.hostel || populatedUser?.locationId?.buildingName || '',
+    roomNumber: user.roomNumber || populatedUser?.locationId?.roomNumber || '',
+    batch: user.batch || ''
   };
 
   // Return user info and token
@@ -134,9 +139,9 @@ const getMe = asyncHandler(async (req, res) => {
         fullName: req.user.fullName,
         role: req.user.role,
         phoneNumber: req.user.phoneNumber,
-        hostel: req.user.hostel,
-        roomNumber: req.user.roomNumber,
-        bedLabel: req.user.bedLabel || 'A'
+        hostel: req.user.hostel || req.user.locationId?.buildingName || '',
+        roomNumber: req.user.roomNumber || req.user.locationId?.roomNumber || '',
+        batch: req.user.batch || ''
       }
     }
   });

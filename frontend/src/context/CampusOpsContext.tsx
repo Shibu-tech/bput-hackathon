@@ -7,6 +7,7 @@ import {
   DeduplicatedTicket,
   DailyMessMenu,
   CafeteriaOrder,
+  CafeteriaItem,
   HostelRoom,
   RollCallRecord,
   BroadcastNotification,
@@ -19,6 +20,7 @@ import {
   initialDeduplicatedTickets,
   dailyMessMenu as initialMessMenu,
   initialOrders,
+  cafeteriaItems as initialCafeteriaMenu,
   hostelRooms as initialRooms,
   rollCallRoster as initialRoster,
   initialBroadcasts,
@@ -57,8 +59,23 @@ interface CampusOpsContextType {
   mealRatings: Record<string, { rating: number; count: number }>;
   rateMealItem: (mealId: string, rating: number) => void;
   cafeteriaOrders: CafeteriaOrder[];
-  placeCafeteriaOrder: (items: CafeteriaOrder['items'], total: number) => CafeteriaOrder;
+  cafeteriaMenu: CafeteriaItem[];
+  addCafeteriaItem: (item: Omit<CafeteriaItem, 'id'>) => CafeteriaItem;
+  updateCafeteriaItem: (id: string, updates: Partial<CafeteriaItem>) => void;
+  deleteCafeteriaItem: (id: string) => void;
+  toggleCafeteriaItemStock: (id: string) => void;
+  placeCafeteriaOrder: (
+    items: CafeteriaOrder['items'],
+    total: number,
+    studentDetails?: {
+      studentName?: string;
+      roomNumber?: string;
+      hostelBlock?: string;
+    }
+  ) => CafeteriaOrder;
   updateOrderStatus: (orderId: string, status: CafeteriaOrder['status']) => void;
+  cancelCafeteriaOrder: (orderId: string) => void;
+  submitOrderReview: (orderId: string, rating: number, review: string) => void;
   messCheckIn: (rollNumber: string) => { success: boolean; studentName?: string };
 
   // Hostel Rooms
@@ -172,46 +189,10 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Helper to build clean rooms with only the logged-in student in their assigned room
-  const buildRoomsForUser = (currentUser: typeof user) => {
-    const studentName = currentUser?.fullName || 'Anish Kumar';
-    const studentRoll = currentUser?.phoneNumber ? `STU-${currentUser.phoneNumber.slice(-4)}` : 'STU-9090';
-    const assignedHostel = currentUser?.hostel || 'Hostel A';
-    const assignedRoomNumber = currentUser?.roomNumber || '101';
-    const assignedBedLabel = currentUser?.bedLabel || 'A';
-
-    return initialRooms.map((rm) => {
-      const isAssignedRoom =
-        rm.roomNumber === assignedRoomNumber &&
-        (rm.block.toLowerCase().includes(assignedHostel.toLowerCase()) ||
-          assignedHostel.toLowerCase().includes(rm.block.toLowerCase()));
-
-      return {
-        ...rm,
-        beds: rm.beds.map((b) => {
-          if (isAssignedRoom && b.bedLabel === assignedBedLabel) {
-            return {
-              ...b,
-              isOccupied: true,
-              occupant: {
-                name: `${studentName} (You)`,
-                rollNumber: studentRoll,
-                branch: 'Computer Science',
-                year: '1st Year',
-                habits: ['Night Owl (Coding)', 'Clean Desk'],
-              },
-            };
-          }
-          // All other beds are strictly vacant — no dummy roommates
-          return {
-            ...b,
-            isOccupied: false,
-            occupant: undefined,
-          };
-        }),
-      };
-    });
-  };
+  const [cafeteriaMenu, setCafeteriaMenu] = useState<CafeteriaItem[]>(() => {
+    const saved = localStorage.getItem('fretops_cafeteria_menu');
+    return saved ? JSON.parse(saved) : initialCafeteriaMenu;
+  });
 
   const [rooms, setRooms] = useState<HostelRoom[]>(() => {
     return buildRoomsForUser(user);
@@ -415,6 +396,10 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     localStorage.setItem('fretops_orders', JSON.stringify(cafeteriaOrders));
   }, [cafeteriaOrders]);
+
+  useEffect(() => {
+    localStorage.setItem('fretops_cafeteria_menu', JSON.stringify(cafeteriaMenu));
+  }, [cafeteriaMenu]);
 
   useEffect(() => {
     localStorage.setItem('fretops_rooms', JSON.stringify(rooms));
@@ -947,19 +932,52 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const placeCafeteriaOrder = (
     items: CafeteriaOrder['items'],
     total: number,
+    studentDetails?: {
+      studentName?: string;
+      roomNumber?: string;
+      hostelBlock?: string;
+    }
   ): CafeteriaOrder => {
     const orderNumber = `CF-${Math.floor(1000 + Math.random() * 9000)}`;
     const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const currentStudentName =
+      studentDetails?.studentName?.trim() ||
+      user?.fullName?.trim() ||
+      'Student';
+
+    // Find student's booked room if available in the rooms system
+    const bookedRoom = rooms.find((r) =>
+      r.beds.some(
+        (b) =>
+          b.occupant?.name?.trim().toLowerCase() === currentStudentName.toLowerCase() ||
+          (user?.phoneNumber && b.occupant?.rollNumber === `STU-${user.phoneNumber.slice(-4)}`)
+      )
+    );
+
+    const resolvedRoom =
+      studentDetails?.roomNumber?.trim() ||
+      user?.roomNumber ||
+      bookedRoom?.roomNumber ||
+      '101';
+
+    const resolvedBlock =
+      studentDetails?.hostelBlock?.trim() ||
+      user?.hostel ||
+      bookedRoom?.block ||
+      'Hostel A';
+
     const newOrder: CafeteriaOrder = {
       id: `ord-${Date.now()}`,
       orderNumber,
-      studentName: user?.fullName || 'Anish Kumar',
-      roomNumber: user?.roomNumber || '101',
-      hostelBlock: user?.hostel || 'Hostel A',
+      studentName: currentStudentName,
+      roomNumber: resolvedRoom,
+      hostelBlock: resolvedBlock,
       items,
       totalAmount: total,
       status: 'received',
       placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: Date.now(),
       deliveryOtp: otp,
     };
     setCafeteriaOrders((prev) => [newOrder, ...prev]);
@@ -969,6 +987,53 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const updateOrderStatus = (orderId: string, status: CafeteriaOrder['status']) => {
     setCafeteriaOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
+    );
+  };
+
+  const cancelCafeteriaOrder = (orderId: string) => {
+    setCafeteriaOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: 'cancelled' } : o)),
+    );
+  };
+
+  const submitOrderReview = (orderId: string, rating: number, review: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setCafeteriaOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId
+          ? {
+              ...o,
+              rating,
+              review: review.trim(),
+              reviewedAt: timeStr,
+            }
+          : o,
+      ),
+    );
+  };
+
+  const addCafeteriaItem = (itemData: Omit<CafeteriaItem, 'id'>): CafeteriaItem => {
+    const newItem: CafeteriaItem = {
+      ...itemData,
+      id: `c-${Date.now()}`,
+    };
+    setCafeteriaMenu((prev) => [newItem, ...prev]);
+    return newItem;
+  };
+
+  const updateCafeteriaItem = (id: string, updates: Partial<CafeteriaItem>) => {
+    setCafeteriaMenu((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+    );
+  };
+
+  const deleteCafeteriaItem = (id: string) => {
+    setCafeteriaMenu((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const toggleCafeteriaItemStock = (id: string) => {
+    setCafeteriaMenu((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, available: !item.available } : item)),
     );
   };
 
@@ -1145,6 +1210,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setComplaints(initialComplaints);
     setDeduplicatedTickets(initialDeduplicatedTickets);
     setCafeteriaOrders(initialOrders);
+    setCafeteriaMenu(initialCafeteriaMenu);
     setRooms(initialRooms);
     setRollCallRecords(initialRoster);
     setBroadcasts(initialBroadcasts);
@@ -1178,8 +1244,15 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         mealRatings,
         rateMealItem,
         cafeteriaOrders,
+        cafeteriaMenu,
+        addCafeteriaItem,
+        updateCafeteriaItem,
+        deleteCafeteriaItem,
+        toggleCafeteriaItemStock,
         placeCafeteriaOrder,
         updateOrderStatus,
+        cancelCafeteriaOrder,
+        submitOrderReview,
         messCheckIn,
         rooms,
         bookBed,

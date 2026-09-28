@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'A'
   },
+  roomNumber: {
+    type: String,
+    trim: true
+  },
   batch: {
     type: String,
     // e.g., '2023', '2024', etc.
