@@ -56,15 +56,10 @@ const getTickets = asyncHandler(async (req, res) => {
  */
 const updateTicketStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
-
-  if (!status) {
-    throw new ApiError(400, 'Status is required');
-  }
 
   const ticket = await ticketService.updateTicketStatus(
     id,
-    { status },
+    req.body,
     req.user._id
   );
 
