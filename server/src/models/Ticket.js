@@ -39,12 +39,28 @@ const ticketSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'DUPLICATE'],
+    enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'DUPLICATE'],
     default: 'OPEN'
   },
   assignedTechId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  assignedByName: {
+    type: String,
+    default: ''
+  },
+  wardenNotes: {
+    type: String,
+    default: ''
+  },
+  rejectionReason: {
+    type: String,
+    default: ''
+  },
+  resolutionNotes: {
+    type: String,
+    default: ''
   },
   parentTicketId: {
     type: mongoose.Schema.Types.ObjectId,

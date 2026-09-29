@@ -13,6 +13,8 @@ import {
   BroadcastNotification,
   EmergencyAlert,
   ComplaintCategory,
+  ComplaintPriority,
+  ComplaintStatus,
   StaffRegistrationRequest,
 } from '../types';
 import {
@@ -50,8 +52,12 @@ interface CampusOpsContextType {
   complaints: Complaint[];
   deduplicatedTickets: DeduplicatedTicket[];
   createComplaint: (complaint: Omit<Complaint, 'id' | 'ticketNumber' | 'status' | 'createdAt' | 'upvotes'>) => Complaint;
-  resolveComplaint: (id: string, notes: string) => void;
-  resolveDeduplicatedTicket: (masterId: string, notes: string) => void;
+  assignComplaint: (id: string, techName: string, category?: ComplaintCategory, wardenNotes?: string, priority?: ComplaintPriority, assignedBy?: string) => Promise<void>;
+  resolveComplaint: (id: string, notes: string, techName?: string) => Promise<void>;
+  rejectComplaint: (id: string, reason: string, techName?: string) => Promise<void>;
+  reopenComplaint: (id: string, notes?: string) => Promise<void>;
+  resolveDeduplicatedTicket: (masterId: string, notes: string, techName?: string) => void;
+  rejectDeduplicatedTicket: (masterId: string, reason: string, techName?: string) => void;
   upvoteComplaint: (id: string) => void;
   simulateOutageSurge: () => void;
 
@@ -109,6 +115,48 @@ interface CampusOpsContextType {
 
 const CampusOpsContext = createContext<CampusOpsContextType | undefined>(undefined);
 
+// Helper to construct room state dynamically based on authenticated user
+const buildRoomsForUser = (currentUser: any): HostelRoom[] => {
+  const baseRooms: HostelRoom[] = JSON.parse(JSON.stringify(initialRooms));
+  if (!currentUser) return baseRooms;
+
+  const targetRoomNum = currentUser.roomNumber;
+  const targetBlock = currentUser.hostel;
+  const targetBed = currentUser.bedLabel || 'A';
+  const studentName = currentUser.fullName || 'Student';
+  const rollNumber = currentUser.phoneNumber ? `STU-${currentUser.phoneNumber.slice(-4)}` : 'STU';
+
+  if (!targetRoomNum) return baseRooms;
+
+  return baseRooms.map((room) => {
+    const blockMatch = !targetBlock || room.block.toLowerCase().trim() === targetBlock.toLowerCase().trim();
+    const roomMatch = room.roomNumber.trim() === targetRoomNum.trim();
+
+    if (roomMatch && blockMatch) {
+      return {
+        ...room,
+        beds: room.beds.map((b) => {
+          if (b.bedLabel === targetBed) {
+            return {
+              ...b,
+              isOccupied: true,
+              occupant: {
+                name: `${studentName} (You)`,
+                rollNumber,
+                branch: 'Computer Science',
+                year: '1st Year',
+                habits: ['Early Riser', 'Studious'],
+              },
+            };
+          }
+          return b;
+        }),
+      };
+    }
+    return room;
+  });
+};
+
 export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, activeRole, setActiveRole, updateUserRoom } = useAuth();
   const [role, setRoleState] = useState<UserRole>(activeRole || 'student');
@@ -165,12 +213,13 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved) {
       try {
         const parsed: Complaint[] = JSON.parse(saved);
-        return parsed.filter((c) => !isMockPerson(c) && !c.id?.startsWith('tc-10'));
+        const filtered = parsed.filter((c) => !isMockPerson(c));
+        if (filtered.length > 0) return filtered;
       } catch {
-        return [];
+        return initialComplaints;
       }
     }
-    return [];
+    return initialComplaints;
   });
 
   const [deduplicatedTickets, setDeduplicatedTickets] = useState<DeduplicatedTicket[]>(() => {
@@ -178,12 +227,12 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved) {
       try {
         const parsed: DeduplicatedTicket[] = JSON.parse(saved);
-        return parsed.filter((d) => !d.id?.startsWith('dt-10'));
+        if (parsed.length > 0) return parsed;
       } catch {
-        return [];
+        return initialDeduplicatedTickets;
       }
     }
-    return [];
+    return initialDeduplicatedTickets;
   });
 
   const [messMenu] = useState<DailyMessMenu>(initialMessMenu);
@@ -500,12 +549,20 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             status:
               t.status === 'RESOLVED'
                 ? 'resolved'
-                : t.status === 'IN_PROGRESS' || t.status === 'ASSIGNED'
-                  ? 'in_progress'
-                  : 'open',
+                : t.status === 'REJECTED'
+                  ? 'rejected'
+                  : t.status === 'ASSIGNED'
+                    ? 'assigned'
+                    : t.status === 'IN_PROGRESS'
+                      ? 'in_progress'
+                      : 'open',
             createdAt: new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            assignedTo: t.assignedTechId?.fullName,
+            assignedTo: t.assignedTechId?.fullName || t.assignedTo,
             assignedTrade: t.category,
+            assignedBy: t.assignedByName,
+            wardenNotes: t.wardenNotes,
+            resolutionNotes: t.resolutionNotes,
+            rejectionReason: t.rejectionReason,
             upvotes: t.duplicateCount || 0,
           }));
           setComplaints(serverComplaints);
@@ -948,8 +1005,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           affectedCount: similarOpen.length + 1,
           reportedRooms: Array.from(new Set([...similarOpen.map((c) => c.roomNumber), data.roomNumber])),
           complaintIds: [...similarOpen.map((c) => c.id), newId],
-          assignedTechnician: getTechnicianForCategory(data.category),
-          status: 'in_progress',
+          status: 'open',
           detectedAt: `${timeStr} (Auto-grouped ${similarOpen.length + 1} recurring reports)`,
           rootCauseCandidate: `Repeated failure reported across multiple rooms (${data.roomNumber}, etc.). Common distribution line check recommended.`,
         };
@@ -981,12 +1037,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ...data,
       id: newId,
       ticketNumber,
-      status: 'assigned',
+      status: 'open',
       createdAt: timeStr,
       upvotes: 1,
       masterTicketId: masterId,
       assignedTrade: getTradeName(data.category),
-      assignedTo: getTechnicianForCategory(data.category),
     };
 
     setComplaints((prev) => [newTicket, ...prev]);
@@ -1022,17 +1077,29 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return newTicket;
   };
 
-  const resolveComplaint = (id: string, notes: string) => {
+  const assignComplaint = async (
+    id: string,
+    techName: string,
+    category?: ComplaintCategory,
+    wardenNotes?: string,
+    priority?: ComplaintPriority,
+    assignedBy: string = 'Hostel Warden',
+  ) => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
           ? {
-            ...c,
-            status: 'resolved',
-            resolvedAt: timeStr,
-            resolutionNotes: notes,
-          }
+              ...c,
+              category: category || c.category,
+              assignedTrade: category ? getTradeName(category) : c.assignedTrade || getTradeName(c.category),
+              assignedTo: techName,
+              assignedBy,
+              assignedAt: timeStr,
+              wardenNotes: wardenNotes !== undefined ? wardenNotes : c.wardenNotes,
+              priority: priority || c.priority,
+              status: 'assigned',
+            }
           : c,
       ),
     );
@@ -1045,12 +1112,107 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: 'RESOLVED' }),
+        body: JSON.stringify({
+          status: 'ASSIGNED',
+          assignedByName: assignedBy,
+          wardenNotes,
+          category: category ? category.toUpperCase() : undefined,
+        }),
       }).catch(console.warn);
     }
   };
 
-  const resolveDeduplicatedTicket = (masterId: string, notes: string) => {
+  const resolveComplaint = async (id: string, notes: string, techName?: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setComplaints((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: 'resolved',
+              resolvedAt: timeStr,
+              resolvedBy: techName || c.assignedTo || 'Duty Technician',
+              resolutionNotes: notes,
+            }
+          : c,
+      ),
+    );
+
+    const token = localStorage.getItem('token');
+    if (token && /^[0-9a-fA-F]{24}$/.test(id)) {
+      fetch(`/api/tickets/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: 'RESOLVED', notes }),
+      }).catch(console.warn);
+    }
+  };
+
+  const rejectComplaint = async (id: string, reason: string, techName?: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setComplaints((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: 'rejected',
+              rejectedAt: timeStr,
+              rejectedBy: techName || c.assignedTo || 'Duty Technician',
+              rejectionReason: reason,
+            }
+          : c,
+      ),
+    );
+
+    const token = localStorage.getItem('token');
+    if (token && /^[0-9a-fA-F]{24}$/.test(id)) {
+      fetch(`/api/tickets/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: 'REJECTED', reason }),
+      }).catch(console.warn);
+    }
+  };
+
+  const reopenComplaint = async (id: string, notes?: string) => {
+    setComplaints((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: 'open',
+              wardenNotes: notes ? `[Reopened] ${notes}` : c.wardenNotes,
+              rejectionReason: undefined,
+              rejectedAt: undefined,
+              rejectedBy: undefined,
+              resolvedAt: undefined,
+              resolvedBy: undefined,
+              resolutionNotes: undefined,
+            }
+          : c,
+      ),
+    );
+
+    const token = localStorage.getItem('token');
+    if (token && /^[0-9a-fA-F]{24}$/.test(id)) {
+      fetch(`/api/tickets/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: 'OPEN', notes }),
+      }).catch(console.warn);
+    }
+  };
+
+  const resolveDeduplicatedTicket = (masterId: string, notes: string, techName?: string) => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const target = deduplicatedTickets.find((d) => d.id === masterId);
     if (!target) return;
@@ -1064,11 +1226,37 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((c) =>
         c.masterTicketId === masterId || target.complaintIds.includes(c.id)
           ? {
-            ...c,
-            status: 'resolved',
-            resolvedAt: timeStr,
-            resolutionNotes: `[Group Resolution ${target.masterCode}] ${notes}`,
-          }
+              ...c,
+              status: 'resolved',
+              resolvedAt: timeStr,
+              resolvedBy: techName || target.assignedTechnician,
+              resolutionNotes: `[Group Resolution ${target.masterCode}] ${notes}`,
+            }
+          : c,
+      ),
+    );
+  };
+
+  const rejectDeduplicatedTicket = (masterId: string, reason: string, techName?: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const target = deduplicatedTickets.find((d) => d.id === masterId);
+    if (!target) return;
+
+    setDeduplicatedTickets((prev) =>
+      prev.map((dt) => (dt.id === masterId ? { ...dt, status: 'resolved' } : dt)),
+    );
+
+    // Reject all grouped child complaints
+    setComplaints((prev) =>
+      prev.map((c) =>
+        c.masterTicketId === masterId || target.complaintIds.includes(c.id)
+          ? {
+              ...c,
+              status: 'rejected',
+              rejectedAt: timeStr,
+              rejectedBy: techName || target.assignedTechnician,
+              rejectionReason: `[Cluster Review ${target.masterCode}] ${reason}`,
+            }
           : c,
       ),
     );
@@ -1442,8 +1630,12 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         complaints,
         deduplicatedTickets,
         createComplaint,
+        assignComplaint,
         resolveComplaint,
+        rejectComplaint,
+        reopenComplaint,
         resolveDeduplicatedTicket,
+        rejectDeduplicatedTicket,
         upvoteComplaint,
         simulateOutageSurge,
         messMenu,
