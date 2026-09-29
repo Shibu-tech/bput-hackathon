@@ -15,6 +15,11 @@ import {
   Bell,
   CheckCircle2,
   XCircle,
+  UserCheck,
+  Clock,
+  FileText,
+  Eye,
+  AlertCircle,
 } from 'lucide-react';
 
 export const AdminPortal: React.FC = () => {
@@ -24,6 +29,9 @@ export const AdminPortal: React.FC = () => {
     rollCallRecords,
     broadcasts,
     cafeteriaOrders,
+    staffRequests,
+    approveStaffRequest,
+    rejectStaffRequest,
   } = useCampusOps();
 
   // Stats calculations
@@ -45,10 +53,14 @@ export const AdminPortal: React.FC = () => {
     .filter((order) => order.status !== 'cancelled')
     .reduce((sum, order) => sum + order.totalAmount, 0);
 
+  const pendingStaffCount = staffRequests.filter((r) => r.status === 'PENDING').length;
+
   // Active tab state
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'operations' | 'reports' | 'settings'
+    'overview' | 'users' | 'operations' | 'reports' | 'settings' | 'staff-verification'
   >('overview');
+
+  const [documentModalUrl, setDocumentModalUrl] = useState<{ name: string; url?: string } | null>(null);
 
   return (
     <div className="space-y-6">
@@ -84,6 +96,17 @@ export const AdminPortal: React.FC = () => {
               onClick={() => setActiveTab('overview')}
               icon={<LayoutDashboard className="w-4 h-4" />}
               label="Overview"
+            />
+
+            <TabButton
+              active={activeTab === 'staff-verification'}
+              onClick={() => setActiveTab('staff-verification')}
+              icon={<UserCheck className="w-4 h-4" />}
+              label={
+                pendingStaffCount > 0
+                  ? `Staff Verification (${pendingStaffCount})`
+                  : 'Staff Verification'
+              }
             />
 
             <TabButton
@@ -928,6 +951,212 @@ export const AdminPortal: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================
+          STAFF VERIFICATION TAB
+      ========================= */}
+      {activeTab === 'staff-verification' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xs uppercase tracking-widest text-indigo-500 font-bold">
+                    Super Admin Verification
+                  </span>
+                  <span className="text-slate-400 text-xs">·</span>
+                  <span className="text-xs text-slate-500">Official Staff Onboarding</span>
+                </div>
+                <h2 className="text-lg font-bold text-slate-900 mt-1">
+                  Staff Registration & Offer Letter Approvals
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Verify employment credentials, inspect uploaded offer letters, and approve or reject staff portal accounts.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-lg">
+                  {staffRequests.filter((r) => r.status === 'PENDING').length} Pending Review
+                </span>
+                <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg">
+                  {staffRequests.filter((r) => r.status === 'APPROVED').length} Verified
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* List of Staff Applications */}
+          <div className="space-y-4">
+            {staffRequests.length === 0 ? (
+              <div className="p-12 text-center bg-white border border-dashed border-slate-200 rounded-xl">
+                <UserCheck className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-slate-700">No staff registration requests</h3>
+                <p className="text-xs text-slate-500 mt-1">New employee applications will appear here.</p>
+              </div>
+            ) : (
+              staffRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs hover:shadow-md transition-all space-y-4"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold flex items-center justify-center text-sm shrink-0">
+                        {req.fullName.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-bold text-slate-900">{req.fullName}</h3>
+                          <span className="font-mono text-2xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                            {req.employeeId}
+                          </span>
+                          <span className="text-2xs font-medium px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {req.roleLabel || req.role}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium mt-0.5">
+                          {req.designation || 'Staff Member'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      {req.status === 'PENDING' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <Clock className="w-3.5 h-3.5 text-amber-500" />
+                          Pending Super Admin Review
+                        </span>
+                      )}
+                      {req.status === 'APPROVED' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          Verified & Approved
+                        </span>
+                      )}
+                      {req.status === 'REJECTED' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                          Rejected
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-1.5 bg-slate-50/70 p-3 rounded-lg border border-slate-100">
+                      <div><span className="text-slate-500">Email:</span> <strong className="text-slate-800">{req.email || 'N/A'}</strong></div>
+                      <div><span className="text-slate-500">Phone:</span> <strong className="text-slate-800">{req.phoneNumber}</strong></div>
+                      <div><span className="text-slate-500">Submitted:</span> <span className="text-slate-700">{req.createdAt || 'Recent'}</span></div>
+                      {req.verificationNotes && (
+                        <div className="pt-1 text-slate-500 text-2xs italic border-t border-slate-200">
+                          Notes: {req.verificationNotes}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-100 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-2xs font-bold uppercase tracking-wider text-slate-500">Offer Letter Attachment</span>
+                        <span className="text-2xs text-emerald-600 font-medium">Uploaded</span>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-white rounded border border-slate-200 mb-2">
+                        <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
+                        <span className="text-xs font-medium text-slate-800 truncate">
+                          {req.offerLetterName || 'Offer_Letter.pdf'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          setDocumentModalUrl({
+                            name: req.offerLetterName || 'Offer Letter',
+                            url: req.offerLetterUrl,
+                          })
+                        }
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium text-xs rounded transition-colors cursor-pointer self-start"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        Inspect Document
+                      </button>
+                    </div>
+                  </div>
+
+                  {req.status === 'PENDING' && (
+                    <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                      <button
+                        onClick={() => rejectStaffRequest(req.id, 'Discrepancy in offer letter credentials')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => approveStaffRequest(req.id, 'Approved by Super Admin')}
+                        className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Accept & Verify
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Document View Preview Modal */}
+      {documentModalUrl && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-5 space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-900">{documentModalUrl.name}</h3>
+              </div>
+              <button
+                onClick={() => setDocumentModalUrl(null)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-100 rounded-xl p-4 flex flex-col items-center justify-center min-h-[350px] max-h-[500px] overflow-auto">
+              {documentModalUrl.url && (documentModalUrl.url.startsWith('data:image') || documentModalUrl.url.startsWith('http')) ? (
+                <img
+                  src={documentModalUrl.url}
+                  alt={documentModalUrl.name}
+                  className="max-h-[460px] object-contain rounded-lg shadow-xs"
+                />
+              ) : (
+                <div className="text-center p-8 space-y-3">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">{documentModalUrl.name}</h4>
+                    <p className="text-xs text-slate-500 mt-1">Official Employment Contract & Offer Document</p>
+                  </div>
+                  <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-full">
+                    Digital Seal & Signature Verified
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setDocumentModalUrl(null)}
+                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 cursor-pointer"
+              >
+                Done Viewing
+              </button>
             </div>
           </div>
         </div>

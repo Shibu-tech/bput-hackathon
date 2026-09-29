@@ -177,3 +177,22 @@ export interface EmergencyAlert {
   active: boolean;
   checkedInStudentsCount: number;
 }
+
+export interface StaffRegistrationRequest {
+  id: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  role: string;
+  roleLabel: string;
+  designation: string;
+  employeeId: string;
+  offerLetterName?: string;
+  offerLetterUrl?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string | number;
+  verifiedAt?: string | number;
+  verificationNotes?: string;
+  verifiedBy?: string;
+}
+

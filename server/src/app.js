@@ -5,7 +5,17 @@ require('dotenv').config();
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
-const { authRoutes, ticketRoutes, gatePassRoutes, noticeRoutes, messRoutes, attendanceRoutes, pushRoutes, locationRoutes } = require('./routes');
+const {
+  authRoutes,
+  ticketRoutes,
+  gatePassRoutes,
+  noticeRoutes,
+  messRoutes,
+  attendanceRoutes,
+  pushRoutes,
+  locationRoutes,
+  fileRoutes,
+} = require('./routes');
 
 const app = express();
 
@@ -28,11 +38,15 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+
+// Body parser with 50mb limit for large documents & GridFS uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', authRoutes);
+app.use('/api/files', fileRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/gate-passes', gatePassRoutes);
 app.use('/api/notices', noticeRoutes);

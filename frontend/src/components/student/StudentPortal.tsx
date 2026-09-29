@@ -22,6 +22,7 @@ import {
   User,
   Sparkles,
   XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
 

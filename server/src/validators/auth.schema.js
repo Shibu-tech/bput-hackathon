@@ -31,9 +31,27 @@ const registerSchema = z.object({
   password: z
     .string({ required_error: 'Password is required' })
     .min(6, 'Password must be at least 6 characters'),
-  role: z.enum(['STUDENT', 'WARDEN', 'TECHNICIAN', 'SECURITY', 'ADMIN', 'MESS', 'KIOSK'], {
+  role: z.enum([
+    'STUDENT',
+    'WARDEN',
+    'TECHNICIAN',
+    'SECURITY',
+    'ADMIN',
+    'MESS',
+    'KIOSK',
+    'FACULTY',
+    'HOD',
+    'ACCOUNTS',
+    'EXAM_CELL',
+  ], {
     errorMap: () => ({ message: 'Invalid role selected' })
   }),
+  // Staff registration fields
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  designation: z.string().optional(),
+  employeeId: z.string().optional(),
+  offerLetter: z.string().optional(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'ACTIVE']).optional(),
   // Optional fields based on role
   locationId: z.string().optional(), // For students
   hostel: z.string().optional(), // For students/wardens

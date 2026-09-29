@@ -9,8 +9,65 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['STUDENT', 'WARDEN', 'TECHNICIAN', 'SECURITY', 'ADMIN', 'MESS', 'KIOSK'],
-    required: true
+    enum: [
+      'STUDENT',
+      'WARDEN',
+      'TECHNICIAN',
+      'SECURITY',
+      'ADMIN',
+      'MESS',
+      'KIOSK',
+      'FACULTY',
+      'HOD',
+      'ACCOUNTS',
+      'EXAM_CELL',
+    ],
+    required: true,
+  },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+  },
+  designation: {
+    type: String,
+    trim: true,
+  },
+  employeeId: {
+    type: String,
+    trim: true,
+  },
+  offerLetter: {
+    type: String, // Stream URL (/api/files/:id) or Base64 data URI
+  },
+  offerLetterFileId: {
+    type: mongoose.Schema.Types.ObjectId, // MongoDB GridFS ObjectId
+  },
+  offerLetterFilename: {
+    type: String,
+    trim: true,
+  },
+  offerLetterContentType: {
+    type: String,
+  },
+  offerLetterSize: {
+    type: Number,
+  },
+  status: {
+    type: String,
+    enum: ['PENDING', 'APPROVED', 'REJECTED', 'ACTIVE'],
+    default: 'ACTIVE',
+  },
+  verificationNotes: {
+    type: String,
+    trim: true,
+  },
+  verifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  verifiedAt: {
+    type: Date,
   },
   phoneNumber: {
     type: String,
@@ -35,19 +92,16 @@ const userSchema = new mongoose.Schema({
   },
   hostel: {
     type: String,
-    enum: ['Hostel A', 'Hostel B', 'Hostel C'], // Adjust as needed
+    enum: ['Hostel A', 'Hostel B', 'Hostel C'],
   },
   roomNumber: {
     type: String,
-    default: '101'
+    default: '101',
+    trim: true,
   },
   bedLabel: {
     type: String,
-    default: 'A'
-  },
-  roomNumber: {
-    type: String,
-    trim: true
+    default: 'A',
   },
   batch: {
     type: String,

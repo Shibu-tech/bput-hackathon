@@ -56,11 +56,15 @@ interface AuthContextType {
     phoneNumber: string;
     password: string;
     role: string;
+    email?: string;
+    designation?: string;
+    employeeId?: string;
+    offerLetter?: string;
     locationId?: string;
     hostel?: string;
     batch?: string;
     shifts?: any[];
-  }) => Promise<void>;
+  }) => Promise<{ isPending?: boolean; message?: string } | void>;
 
   logout: () => void;
 }
@@ -262,11 +266,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     phoneNumber: string;
     password: string;
     role: string;
+    email?: string;
+    designation?: string;
+    employeeId?: string;
+    offerLetter?: string;
     locationId?: string;
     hostel?: string;
     batch?: string;
     shifts?: any[];
-  }): Promise<void> => {
+  }): Promise<{ isPending?: boolean; message?: string } | void> => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
@@ -285,6 +293,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const data = await res.json();
+    if (data.isPending) {
+      return { isPending: true, message: data.message };
+    }
+
     const authToken = data.data?.token || data.token;
     const rawUser = data.data?.user || data.user;
 

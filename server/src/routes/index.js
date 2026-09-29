@@ -6,6 +6,7 @@ const messRoutes = require('./mess.routes');
 const attendanceRoutes = require('./attendance.routes');
 const pushRoutes = require('./push.routes');
 const locationRoutes = require('./location.routes');
+const fileRoutes = require('./file.routes');
 
 module.exports = {
   authRoutes,
@@ -15,5 +16,6 @@ module.exports = {
   messRoutes,
   attendanceRoutes,
   pushRoutes,
-  locationRoutes
+  locationRoutes,
+  fileRoutes,
 };

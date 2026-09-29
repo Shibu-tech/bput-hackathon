@@ -14,7 +14,10 @@ router.post('/login', validate(loginSchema, 'body'), authController.login);
 // GET /api/me
 router.get('/me', authenticate, authController.getMe);
 
-// PATCH /api/auth/room
-router.patch('/room', authenticate, authController.updateRoom);
+// GET /api/auth/staff-requests (Super Admin verification)
+router.get('/staff-requests', authenticate, authController.getStaffRequests);
+
+// PATCH /api/auth/staff-requests/:id/verify (Super Admin accept/reject)
+router.patch('/staff-requests/:id/verify', authenticate, authController.verifyStaffRequest);
 
 module.exports = router;

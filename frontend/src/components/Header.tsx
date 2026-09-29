@@ -10,11 +10,13 @@ import {
   ChevronDown,
   LogOut,
   User as UserIcon,
+  UserCheck,
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenEmergencyModal: () => void;
   onOpenAdoptionPlaybook: () => void;
+  onOpenStaffVerification?: () => void;
   activeView: string;
   setActiveView: (view: string) => void;
   activeRole: UserRole;
@@ -25,6 +27,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenEmergencyModal,
   onOpenAdoptionPlaybook,
+  onOpenStaffVerification,
   activeView,
   setActiveView,
   activeRole,
@@ -39,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
     lowDataMode,
     setLowDataMode,
     activeEmergency,
+    staffRequests,
   } = useCampusOps();
 
   const { user, logout } = useAuth();
@@ -112,6 +116,22 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Active Portal: {activeRoleLabel}</span>
               </div>
+            )}
+
+            {isSuperAdmin && onOpenStaffVerification && (
+              <button
+                onClick={onOpenStaffVerification}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs transition-all cursor-pointer ml-1"
+                title="Verify staff applications & offer letters"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Verify Staff</span>
+                {staffRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-2xs font-extrabold bg-amber-500 text-white animate-pulse">
+                    {staffRequests.filter((r) => r.status === 'PENDING').length}
+                  </span>
+                )}
+              </button>
             )}
 
             <button

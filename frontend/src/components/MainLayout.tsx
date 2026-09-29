@@ -11,6 +11,7 @@ import { MessCafeteriaPortal } from './mess/MessCafeteriaPortal';
 import { SelfServiceKiosk } from './kiosk/SelfServiceKiosk';
 import { RolloutAdoptionPlaybook } from './adoption/RolloutAdoptionPlaybook';
 import { AdminPortal } from './admin/AdminPortal';
+import { StaffVerificationModal } from './admin/StaffVerificationModal';
 
 import {
   ShieldAlert,
@@ -39,6 +40,9 @@ const MainLayout: React.FC = () => {
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] =
     useState(false);
 
+  const [isStaffModalOpen, setIsStaffModalOpen] =
+    useState(false);
+
   const [activeView, setActiveView] =
     useState<string>('main');
 
@@ -56,11 +60,19 @@ const MainLayout: React.FC = () => {
         onOpenAdoptionPlaybook={() =>
           setActiveView('adoption')
         }
+        onOpenStaffVerification={() =>
+          setIsStaffModalOpen(true)
+        }
         activeView={activeView}
         setActiveView={setActiveView}
         activeRole={activeRole}
         setActiveRole={setActiveRole}
         isSuperAdmin={isSuperAdmin}
+      />
+
+      <StaffVerificationModal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
       />
 
       {activeEmergency && (

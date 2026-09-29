@@ -13,6 +13,7 @@ import {
   BroadcastNotification,
   EmergencyAlert,
   ComplaintCategory,
+  StaffRegistrationRequest,
 } from '../types';
 import {
   initialGatePasses,
@@ -94,6 +95,13 @@ interface CampusOpsContextType {
   triggerEmergencyAlert: (type: EmergencyAlert['type'], title: string, message: string, musterPoint: string) => void;
   dismissEmergencyAlert: () => void;
   checkInMuster: (studentName?: string) => void;
+
+  // Staff Verification (Super Admin)
+  staffRequests: StaffRegistrationRequest[];
+  approveStaffRequest: (id: string, notes?: string) => Promise<void>;
+  rejectStaffRequest: (id: string, reason?: string) => Promise<void>;
+  addStaffRequest: (request: StaffRegistrationRequest) => void;
+  refreshStaffRequests: () => Promise<void>;
 
   // Reset to demo initial
   resetDemoData: () => void;
@@ -194,6 +202,47 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return saved ? JSON.parse(saved) : initialCafeteriaMenu;
   });
 
+  // Helper to build clean rooms with only the logged-in student in their assigned room
+  const buildRoomsForUser = (currentUser: typeof user) => {
+    const studentName = currentUser?.fullName || 'Anish Kumar';
+    const studentRoll = currentUser?.phoneNumber ? `STU-${currentUser.phoneNumber.slice(-4)}` : 'STU-9090';
+    const assignedHostel = currentUser?.hostel || 'Hostel A';
+    const assignedRoomNumber = currentUser?.roomNumber || '101';
+    const assignedBedLabel = currentUser?.bedLabel || 'A';
+
+    return initialRooms.map((rm) => {
+      const isAssignedRoom =
+        rm.roomNumber === assignedRoomNumber &&
+        (rm.block.toLowerCase().includes(assignedHostel.toLowerCase()) ||
+          assignedHostel.toLowerCase().includes(rm.block.toLowerCase()));
+
+      return {
+        ...rm,
+        beds: rm.beds.map((b) => {
+          if (isAssignedRoom && b.bedLabel === assignedBedLabel) {
+            return {
+              ...b,
+              isOccupied: true,
+              occupant: {
+                name: `${studentName} (You)`,
+                rollNumber: studentRoll,
+                branch: 'Computer Science',
+                year: '1st Year',
+                habits: ['Night Owl (Coding)', 'Clean Desk'],
+              },
+            };
+          }
+          // All other beds are strictly vacant — no dummy roommates
+          return {
+            ...b,
+            isOccupied: false,
+            occupant: undefined,
+          };
+        }),
+      };
+    });
+  };
+
   const [rooms, setRooms] = useState<HostelRoom[]>(() => {
     return buildRoomsForUser(user);
   });
@@ -232,6 +281,163 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   const [activeEmergency, setActiveEmergency] = useState<EmergencyAlert | null>(null);
+
+  // Staff Registration Requests (for Super Admin verification)
+  const [staffRequests, setStaffRequests] = useState<StaffRegistrationRequest[]>(() => {
+    const saved = localStorage.getItem('fretops_staff_requests');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return [
+      {
+        id: 'sr-1001',
+        fullName: 'Dr. Ramesh Chandra',
+        email: 'ramesh.chandra@campus.edu.in',
+        phoneNumber: '9845012345',
+        role: 'FACULTY',
+        roleLabel: 'Faculty / Staff',
+        designation: 'Associate Professor, Computer Science',
+        employeeId: 'EMP-2026-104',
+        offerLetterName: 'Faculty_Offer_Letter_Ramesh.pdf',
+        offerLetterUrl: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop&q=80',
+        status: 'PENDING',
+        createdAt: 'Today, 09:30 AM',
+      },
+      {
+        id: 'sr-1002',
+        fullName: 'Dr. Sunita Deshmukh',
+        email: 'sunita.deshmukh@campus.edu.in',
+        phoneNumber: '9876123456',
+        role: 'HOD',
+        roleLabel: 'Head of Department (HOD)',
+        designation: 'Head of Department, Electrical Engg',
+        employeeId: 'EMP-2026-218',
+        offerLetterName: 'HOD_Appointment_Sunita.pdf',
+        offerLetterUrl: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=800&auto=format&fit=crop&q=80',
+        status: 'PENDING',
+        createdAt: 'Yesterday, 04:15 PM',
+      },
+      {
+        id: 'sr-1003',
+        fullName: 'Praveen Kumar Verma',
+        email: 'praveen.verma@campus.edu.in',
+        phoneNumber: '9811223344',
+        role: 'ACCOUNTS',
+        roleLabel: 'Accounts / Finance Cell',
+        designation: 'Chief Finance Officer',
+        employeeId: 'EMP-2026-349',
+        offerLetterName: 'Finance_Offer_Praveen.pdf',
+        offerLetterUrl: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=800&auto=format&fit=crop&q=80',
+        status: 'PENDING',
+        createdAt: '2 days ago',
+      },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('fretops_staff_requests', JSON.stringify(staffRequests));
+  }, [staffRequests]);
+
+  const refreshStaffRequests = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/auth/staff-requests', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.data) && data.data.length > 0) {
+          setStaffRequests((prev) => {
+            const serverMap = new Map(data.data.map((item: any) => [item.id, item]));
+            const merged = [...data.data];
+            prev.forEach((p) => {
+              if (!serverMap.has(p.id)) {
+                merged.push(p);
+              }
+            });
+            return merged;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch server staff requests:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshStaffRequests();
+  }, []);
+
+  const approveStaffRequest = async (id: string, notes?: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setStaffRequests((prev) =>
+      prev.map((req) =>
+        req.id === id
+          ? {
+              ...req,
+              status: 'APPROVED',
+              verifiedAt: timeStr,
+              verificationNotes: notes || 'Verified & approved by Super Admin',
+            }
+          : req
+      )
+    );
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await fetch(`/api/auth/staff-requests/${id}/verify`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: 'APPROVED', notes }),
+        });
+      } catch (err) {
+        console.warn('Could not sync approve to server:', err);
+      }
+    }
+  };
+
+  const rejectStaffRequest = async (id: string, reason?: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setStaffRequests((prev) =>
+      prev.map((req) =>
+        req.id === id
+          ? {
+              ...req,
+              status: 'REJECTED',
+              verifiedAt: timeStr,
+              verificationNotes: reason || 'Application rejected by Super Admin',
+            }
+          : req
+      )
+    );
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await fetch(`/api/auth/staff-requests/${id}/verify`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: 'REJECTED', notes: reason }),
+        });
+      } catch (err) {
+        console.warn('Could not sync reject to server:', err);
+      }
+    }
+  };
+
+  const addStaffRequest = (newReq: StaffRegistrationRequest) => {
+    setStaffRequests((prev) => [newReq, ...prev]);
+  };
 
   // Auto-clean any stale mock demo keys from localStorage on mount
   useEffect(() => {
@@ -295,8 +501,8 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               t.status === 'RESOLVED'
                 ? 'resolved'
                 : t.status === 'IN_PROGRESS' || t.status === 'ASSIGNED'
-                ? 'in_progress'
-                : 'open',
+                  ? 'in_progress'
+                  : 'open',
             createdAt: new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             assignedTo: t.assignedTechId?.fullName,
             assignedTrade: t.category,
@@ -340,12 +546,12 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               p.status === 'APPROVED'
                 ? 'approved'
                 : p.status === 'REJECTED'
-                ? 'rejected'
-                : p.status === 'EXITED'
-                ? 'checked_out'
-                : p.status === 'RETURNED'
-                ? 'completed'
-                : 'pending',
+                  ? 'rejected'
+                  : p.status === 'EXITED'
+                    ? 'checked_out'
+                    : p.status === 'RETURNED'
+                      ? 'completed'
+                      : 'pending',
             parentConsentVerified: true,
             parentPhone: p.studentId?.phoneNumber || '',
             approvedBy: p.approvedBy?.fullName,
@@ -513,11 +719,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((pass) =>
         pass.id === id
           ? {
-              ...pass,
-              status: 'approved',
-              approvedBy: approverName,
-              approvedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            }
+            ...pass,
+            status: 'approved',
+            approvedBy: approverName,
+            approvedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }
           : pass,
       ),
     );
@@ -539,13 +745,13 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             prev.map((pass) =>
               pass.id === id
                 ? {
-                    ...pass,
-                    passCode: data.data.qrCode || pass.passCode,
-                    qrCode: data.data.qrCode,
-                    qrImage: data.data.qrImage,
-                    qrToken: data.data.qrToken,
-                    issueCount: data.data.issueCount || pass.issueCount,
-                  }
+                  ...pass,
+                  passCode: data.data.qrCode || pass.passCode,
+                  qrCode: data.data.qrCode,
+                  qrImage: data.data.qrImage,
+                  qrToken: data.data.qrToken,
+                  issueCount: data.data.issueCount || pass.issueCount,
+                }
                 : pass,
             ),
           );
@@ -561,10 +767,10 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((pass) =>
         pass.id === id
           ? {
-              ...pass,
-              status: 'rejected',
-              rejectionReason: reason,
-            }
+            ...pass,
+            status: 'rejected',
+            rejectionReason: reason,
+          }
           : pass,
       ),
     );
@@ -822,11 +1028,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((c) =>
         c.id === id
           ? {
-              ...c,
-              status: 'resolved',
-              resolvedAt: timeStr,
-              resolutionNotes: notes,
-            }
+            ...c,
+            status: 'resolved',
+            resolvedAt: timeStr,
+            resolutionNotes: notes,
+          }
           : c,
       ),
     );
@@ -1002,11 +1208,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((o) =>
         o.id === orderId
           ? {
-              ...o,
-              rating,
-              review: review.trim(),
-              reviewedAt: timeStr,
-            }
+            ...o,
+            rating,
+            review: review.trim(),
+            reviewedAt: timeStr,
+          }
           : o,
       ),
     );
@@ -1265,6 +1471,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         triggerEmergencyAlert,
         dismissEmergencyAlert,
         checkInMuster,
+        staffRequests,
+        approveStaffRequest,
+        rejectStaffRequest,
+        addStaffRequest,
+        refreshStaffRequests,
         resetDemoData,
       }}
     >
