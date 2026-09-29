@@ -161,12 +161,32 @@ const updateTicketStatus = async (ticketId, statusUpdate, updatedBy) => {
     throw new ApiError(404, 'Ticket not found');
   }
 
-  // Update status
-  ticket.status = statusUpdate.status;
+  // Update status and details
+  if (statusUpdate.status) {
+    ticket.status = statusUpdate.status;
+  }
+  if (statusUpdate.reason !== undefined) {
+    ticket.rejectionReason = statusUpdate.reason;
+  }
+  if (statusUpdate.notes !== undefined) {
+    ticket.resolutionNotes = statusUpdate.notes;
+  }
+  if (statusUpdate.assignedByName !== undefined) {
+    ticket.assignedByName = statusUpdate.assignedByName;
+  }
+  if (statusUpdate.wardenNotes !== undefined) {
+    ticket.wardenNotes = statusUpdate.wardenNotes;
+  }
+  if (statusUpdate.assignedTechId) {
+    ticket.assignedTechId = statusUpdate.assignedTechId;
+  }
+  if (statusUpdate.category) {
+    ticket.category = statusUpdate.category;
+  }
 
   // Add to status history
   ticket.statusHistory.push({
-    status: statusUpdate.status,
+    status: ticket.status,
     changedAt: new Date(),
     changedBy: updatedBy
   });

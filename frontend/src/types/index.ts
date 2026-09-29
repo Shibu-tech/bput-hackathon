@@ -35,7 +35,7 @@ export interface GatePass {
 
 export type ComplaintCategory = 'electrical' | 'plumbing' | 'wifi' | 'carpentry' | 'cleaning' | 'ac';
 export type ComplaintPriority = 'low' | 'medium' | 'high' | 'critical';
-export type ComplaintStatus = 'open' | 'assigned' | 'in_progress' | 'resolved';
+export type ComplaintStatus = 'open' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
 
 export interface Complaint {
   id: string;
@@ -52,8 +52,15 @@ export interface Complaint {
   createdAt: string;
   assignedTo?: string;
   assignedTrade?: string;
+  assignedBy?: string;
+  assignedAt?: string;
+  wardenNotes?: string;
   resolvedAt?: string;
+  resolvedBy?: string;
   resolutionNotes?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
   photoUrl?: string;
   masterTicketId?: string; // If grouped into deduplicated issue
   upvotes: number;
@@ -68,7 +75,7 @@ export interface DeduplicatedTicket {
   affectedCount: number;
   reportedRooms: string[];
   complaintIds: string[];
-  assignedTechnician: string;
+  assignedTechnician?: string;
   status: ComplaintStatus;
   detectedAt: string;
   rootCauseCandidate: string;
