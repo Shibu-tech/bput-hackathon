@@ -1,46 +1,36 @@
 const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const {
-  getFileMetadata,
-  openDownloadStream,
-} = require('../services/gridfs.service');
+const User = require('../models/User');
 
 /**
- * @desc    Stream file from MongoDB GridFS
+ * @desc    Get file / redirect to Supabase storage URL
  * @route   GET /api/files/:id
  * @access  Public / Authenticated
  */
 const getFileById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, 'Invalid file ID format');
+  // Search if any user has this file ID or Supabase document reference
+  let user = null;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    const objId = new mongoose.Types.ObjectId(id);
+    user = await User.findOne({
+      $or: [
+        { _id: objId },
+        { offerLetterFileId: objId },
+        { offerLetterFileId: id },
+      ],
+    });
   }
 
-  const fileMeta = await getFileMetadata(id);
-  if (!fileMeta) {
-    throw new ApiError(404, 'File not found in storage');
-  }
-
-  const contentType = fileMeta.contentType || fileMeta.metadata?.contentType || 'application/pdf';
-  res.set({
-    'Content-Type': contentType,
-    'Content-Length': fileMeta.length,
-    'Content-Disposition': `inline; filename="${encodeURIComponent(fileMeta.filename || 'offer_letter.pdf')}"`,
-    'Cache-Control': 'public, max-age=86400',
-  });
-
-  const downloadStream = openDownloadStream(id);
-
-  downloadStream.on('error', (err) => {
-    console.error('Error streaming file from GridFS:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ success: false, message: 'Error streaming file' });
+  if (user && user.offerLetter) {
+    if (user.offerLetter.startsWith('http://') || user.offerLetter.startsWith('https://')) {
+      return res.redirect(user.offerLetter);
     }
-  });
+  }
 
-  downloadStream.pipe(res);
+  throw new ApiError(404, 'File not found. Documents are now hosted directly on Supabase Storage.');
 });
 
 module.exports = {

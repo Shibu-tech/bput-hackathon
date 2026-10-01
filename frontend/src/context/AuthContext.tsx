@@ -60,11 +60,12 @@ interface AuthContextType {
     designation?: string;
     employeeId?: string;
     offerLetter?: string;
+    offerLetterName?: string;
     locationId?: string;
     hostel?: string;
     batch?: string;
     shifts?: any[];
-  }) => Promise<{ isPending?: boolean; message?: string } | void>;
+  }) => Promise<{ isPending?: boolean; message?: string; user?: any; data?: any } | void>;
 
   logout: () => void;
 }
@@ -270,11 +271,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     designation?: string;
     employeeId?: string;
     offerLetter?: string;
+    offerLetterName?: string;
     locationId?: string;
     hostel?: string;
     batch?: string;
     shifts?: any[];
-  }): Promise<{ isPending?: boolean; message?: string } | void> => {
+  }): Promise<{ isPending?: boolean; message?: string; user?: any; data?: any } | void> => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
@@ -294,7 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const data = await res.json();
     if (data.isPending) {
-      return { isPending: true, message: data.message };
+      return { isPending: true, message: data.message, user: data.data?.user || data.user, data: data.data };
     }
 
     const authToken = data.data?.token || data.token;
