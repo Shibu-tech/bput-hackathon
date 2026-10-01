@@ -297,14 +297,16 @@ const Register: React.FC = () => {
         designation: designation.trim(),
         employeeId: employeeId.trim(),
         offerLetter: offerLetterFile?.dataUrl || '',
+        offerLetterName: offerLetterFile?.name || 'Offer_Letter.pdf',
       };
 
       // Register via backend/context
-      await register(staffRegistrationPayload);
+      const regResult = await register(staffRegistrationPayload);
+      const serverUser = (regResult as any)?.user || (regResult as any)?.data?.user;
 
       // Add to Super Admin local request list for immediate review & synchronization
       addStaffRequest({
-        id: `sr-${Date.now()}`,
+        id: serverUser?.id ? serverUser.id.toString() : `sr-${Date.now()}`,
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         phoneNumber: phoneNumber.trim(),
@@ -312,8 +314,9 @@ const Register: React.FC = () => {
         roleLabel: selectedRole.title,
         designation: designation.trim(),
         employeeId: employeeId.trim(),
-        offerLetterName: offerLetterFile?.name || 'Offer_Letter.pdf',
-        offerLetterUrl: offerLetterFile?.dataUrl,
+        offerLetterName: serverUser?.offerLetterName || offerLetterFile?.name || 'Offer_Letter.pdf',
+        offerLetterUrl: serverUser?.offerLetterUrl || serverUser?.offerLetter || offerLetterFile?.dataUrl,
+        offerLetter: serverUser?.offerLetter || serverUser?.offerLetterUrl || offerLetterFile?.dataUrl,
         status: 'PENDING',
         createdAt: 'Just now',
       });
@@ -953,12 +956,15 @@ const Register: React.FC = () => {
 
       {/* Offer Letter Document Preview Dialog */}
       {previewModalOpen && offerLetterFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-5 space-y-4 border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-5 space-y-4 border border-slate-200 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">{offerLetterFile.name}</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{offerLetterFile.name}</h3>
+                  <p className="text-2xs text-slate-400">{offerLetterFile.size} · {offerLetterFile.type || 'Document'}</p>
+                </div>
               </div>
               <button
                 type="button"
@@ -969,23 +975,45 @@ const Register: React.FC = () => {
               </button>
             </div>
 
-            <div className="bg-slate-100 rounded-xl p-4 flex flex-col items-center justify-center min-h-[300px] max-h-[460px] overflow-auto">
-              {offerLetterFile.dataUrl.startsWith('data:image') || offerLetterFile.dataUrl.startsWith('http') ? (
-                <img
-                  src={offerLetterFile.dataUrl}
-                  alt={offerLetterFile.name}
-                  className="max-h-[420px] object-contain rounded-lg shadow-xs"
-                />
-              ) : (
-                <div className="text-center p-6 space-y-2">
-                  <FileText className="w-12 h-12 text-indigo-600 mx-auto" />
-                  <h4 className="text-sm font-bold text-slate-800">{offerLetterFile.name}</h4>
-                  <p className="text-xs text-slate-500">Official PDF Appointment Letter</p>
-                  <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
-                    File attached & ready for Super Admin verification
-                  </span>
-                </div>
-              )}
+            <div className="bg-slate-50 rounded-xl p-2 flex flex-col items-center justify-center min-h-[350px] max-h-[540px] overflow-hidden border border-slate-200">
+              {(() => {
+                const dataUrl = offerLetterFile.dataUrl || '';
+                const isPdf = offerLetterFile.type === 'application/pdf' || dataUrl.startsWith('data:application/pdf') || offerLetterFile.name.toLowerCase().endsWith('.pdf');
+                const isImg = offerLetterFile.type.startsWith('image/') || dataUrl.startsWith('data:image/');
+
+                if (isPdf && dataUrl) {
+                  return (
+                    <iframe
+                      src={dataUrl}
+                      title={offerLetterFile.name}
+                      className="w-full h-[500px] rounded-lg border border-slate-200 bg-white"
+                    />
+                  );
+                }
+
+                if (isImg && dataUrl) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center p-2 overflow-auto">
+                      <img
+                        src={dataUrl}
+                        alt={offerLetterFile.name}
+                        className="max-h-[480px] w-auto max-w-full rounded-lg object-contain shadow-xs border border-slate-200"
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="text-center p-6 space-y-2">
+                    <FileText className="w-12 h-12 text-indigo-600 mx-auto" />
+                    <h4 className="text-sm font-bold text-slate-800">{offerLetterFile.name}</h4>
+                    <p className="text-xs text-slate-500">Official Document Attachment</p>
+                    <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
+                      File attached & ready for Super Admin verification
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex justify-end">

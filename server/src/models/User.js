@@ -38,10 +38,14 @@ const userSchema = new mongoose.Schema({
     trim: true,
   },
   offerLetter: {
-    type: String, // Stream URL (/api/files/:id) or Base64 data URI
+    type: String, // Supabase public URL or document URI
+  },
+  offerLetterPath: {
+    type: String, // Supabase Storage object path (e.g. offer-letters/...)
+    trim: true,
   },
   offerLetterFileId: {
-    type: mongoose.Schema.Types.ObjectId, // MongoDB GridFS ObjectId
+    type: mongoose.Schema.Types.Mixed, // Legacy fallback
   },
   offerLetterFilename: {
     type: String,

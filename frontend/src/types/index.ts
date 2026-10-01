@@ -196,6 +196,7 @@ export interface StaffRegistrationRequest {
   employeeId: string;
   offerLetterName?: string;
   offerLetterUrl?: string;
+  offerLetter?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string | number;
   verifiedAt?: string | number;

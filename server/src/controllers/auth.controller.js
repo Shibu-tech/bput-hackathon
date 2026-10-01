@@ -2,8 +2,7 @@ const User = require('../models/User');
 const jwt = require('../utils/jwt');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { registerSchema } = require('../validators/auth.schema');
-const { uploadBase64ToGridFS } = require('../services/gridfs.service');
+const { uploadBase64ToSupabase } = require('../services/supabase.service');
 
 /**
  * @desc    Authenticate user & get token
@@ -86,6 +85,7 @@ const register = asyncHandler(async (req, res) => {
     designation,
     employeeId,
     offerLetter,
+    offerLetterName,
     locationId,
     hostel,
     roomNumber,
@@ -121,25 +121,38 @@ const register = asyncHandler(async (req, res) => {
   if (designation) userData.designation = designation.trim();
   if (employeeId) userData.employeeId = employeeId.trim();
 
-  // If offer letter is provided, upload directly into MongoDB GridFS
+  // If offer letter is provided, upload directly into Supabase Storage
   if (offerLetter) {
     if (typeof offerLetter === 'string' && (offerLetter.startsWith('data:') || offerLetter.length > 200)) {
       try {
-        const cleanFilename = `${(fullName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_')}_Offer_Letter.pdf`;
-        const gridfsFile = await uploadBase64ToGridFS(cleanFilename, offerLetter, {
+        let ext = '.pdf';
+        if (offerLetter.startsWith('data:image/png')) ext = '.png';
+        else if (offerLetter.startsWith('data:image/jpeg') || offerLetter.startsWith('data:image/jpg')) ext = '.jpg';
+        else if (offerLetterName && offerLetterName.includes('.')) {
+          ext = '.' + offerLetterName.split('.').pop();
+        }
+
+        const safePrefix = (fullName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_');
+        const cleanFilename = offerLetterName
+          ? offerLetterName.replace(/[^a-zA-Z0-9._-]/g, '_')
+          : `${safePrefix}_Offer_Letter${ext}`;
+
+        const supabaseFile = await uploadBase64ToSupabase(cleanFilename, offerLetter, {
           candidateName: fullName,
           phoneNumber: trimmedPhone,
           employeeId: employeeId || '',
           role,
         });
 
-        userData.offerLetterFileId = gridfsFile.fileId;
-        userData.offerLetter = `/api/files/${gridfsFile.fileId}`;
-        userData.offerLetterFilename = gridfsFile.filename;
-        userData.offerLetterContentType = gridfsFile.contentType;
-        userData.offerLetterSize = gridfsFile.length;
-      } catch (gridfsErr) {
-        console.warn('GridFS storage warning (falling back to direct URI):', gridfsErr.message);
+        // Store direct public URL from Supabase
+        userData.offerLetter = supabaseFile.publicUrl;
+        userData.offerLetterPath = supabaseFile.path;
+        userData.offerLetterFilename = supabaseFile.filename;
+        userData.offerLetterContentType = supabaseFile.contentType;
+        userData.offerLetterSize = supabaseFile.size;
+        console.log(`Document successfully uploaded to Supabase Storage: ${supabaseFile.publicUrl}`);
+      } catch (uploadErr) {
+        console.error('Supabase storage upload error:', uploadErr.message);
         userData.offerLetter = offerLetter;
       }
     } else {
@@ -172,6 +185,9 @@ const register = asyncHandler(async (req, res) => {
     designation: user.designation || '',
     employeeId: user.employeeId || '',
     status: user.status,
+    offerLetter: user.offerLetter || '',
+    offerLetterUrl: user.offerLetter || '',
+    offerLetterName: user.offerLetterFilename || `${user.fullName.replace(/\s+/g, '_')}_Offer_Letter.pdf`,
     hostel: user.hostel || populatedUser?.locationId?.buildingName || '',
     roomNumber: user.roomNumber || populatedUser?.locationId?.roomNumber || '',
     batch: user.batch || ''
@@ -296,8 +312,12 @@ const getStaffRequests = asyncHandler(async (req, res) => {
       role: u.role,
       designation: u.designation || '',
       employeeId: u.employeeId || '',
-      offerLetter: u.offerLetter || (u.offerLetterFileId ? `/api/files/${u.offerLetterFileId}` : ''),
+      offerLetter: u.offerLetter || '',
+      offerLetterUrl: u.offerLetter || '',
       offerLetterName: u.offerLetterFilename || `${u.fullName.replace(/\s+/g, '_')}_Offer_Letter.pdf`,
+      offerLetterPath: u.offerLetterPath || '',
+      offerLetterContentType: u.offerLetterContentType || 'application/pdf',
+      offerLetterSize: u.offerLetterSize || 0,
       offerLetterFileId: u.offerLetterFileId ? u.offerLetterFileId.toString() : null,
       status: u.status || 'PENDING',
       verificationNotes: u.verificationNotes || '',
