@@ -23,8 +23,13 @@ import {
   Sparkles,
   XCircle,
   RefreshCw,
+  BookOpen,
+  Award,
+  FileText,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
+import { StudentMarksheetView } from './StudentMarksheetView';
+import { StudentCertificateView } from './StudentCertificateView';
 
 export const StudentPortal: React.FC = () => {
   const {
@@ -52,6 +57,7 @@ export const StudentPortal: React.FC = () => {
 
   // Active sub-tab for student portal
   const [activeTab, setActiveTab] = useState<'passes' | 'rooms' | 'complaints' | 'mess' | 'academics'>('passes');
+  const [academicSubTab, setAcademicSubTab] = useState<'marks' | 'certificates' | 'schedule'>('marks');
 
   // Gate Pass Form State
   const [showPassModal, setShowPassModal] = useState(false);
@@ -1365,78 +1371,172 @@ export const StudentPortal: React.FC = () => {
 
       {/* SUB-VIEW 5: ACADEMICS & NO-DUES CLEARANCES */}
       {activeTab === 'academics' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-900">
-              Academic Attendance & Schedule Visibility
-            </h2>
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-              <div>
-                <div className="text-2xs uppercase text-slate-500 font-semibold">
-                  Cumulative Semester Attendance
-                </div>
-                <div className="text-2xl font-bold font-mono text-emerald-600 tabular-nums">
-                  88.5%
-                </div>
-                <div className="text-2xs text-slate-500 mt-0.5">Above mandatory 75% threshold</div>
-              </div>
-              <div className="w-12 h-12 rounded-full border-4 border-emerald-500 flex items-center justify-center font-bold text-xs text-emerald-700 bg-white">
-                Safe
-              </div>
+        <div className="space-y-6">
+          {/* Sub-navigation inside Academics */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
+              <button
+                onClick={() => setAcademicSubTab('marks')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  academicSubTab === 'marks'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Subject-Wise Marksheet</span>
+              </button>
+
+              <button
+                onClick={() => setAcademicSubTab('certificates')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  academicSubTab === 'certificates'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Certificates & No-Due Requests</span>
+              </button>
+
+              <button
+                onClick={() => setAcademicSubTab('schedule')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                  academicSubTab === 'schedule'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-slate-600" />
+                <span>Attendance & Timetable</span>
+              </button>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="font-semibold text-slate-700">Today's Class Timetable</div>
-              {[
-                { time: '09:00 - 10:30', course: 'CS301: Advanced Data Structures & Algorithms', hall: 'Lecture Hall 102' },
-                { time: '11:00 - 12:30', course: 'CS304: Computer Networks & Socket Programming', hall: 'Lab 4 (Systems Wing)' },
-                { time: '14:30 - 16:00', course: 'CS309: Cloud & Distributed Operating Systems', hall: 'Seminar Room B' },
-              ].map((c, i) => (
-                <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-md flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-slate-900">{c.course}</div>
-                    <div className="text-2xs text-slate-500">{c.hall}</div>
+            <div className="flex items-center gap-3 text-2xs text-slate-500 pr-2">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Semester 5 (Autumn 2024)
+              </span>
+              <span>·</span>
+              <span className="font-mono text-slate-700 font-semibold">{studentRoll}</span>
+            </div>
+          </div>
+
+          {/* Sub-view: Subject-Wise Marksheet */}
+          {academicSubTab === 'marks' && (
+            <StudentMarksheetView
+              studentName={studentDisplayName}
+              studentRoll={studentRoll}
+            />
+          )}
+
+          {academicSubTab === 'certificates' && (
+            <StudentCertificateView
+              studentName={studentDisplayName}
+              studentRoll={studentRoll}
+            />
+          )}
+
+          {academicSubTab === 'schedule' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Academic Attendance & Schedule Visibility
+                  </h2>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                    <div>
+                      <div className="text-2xs uppercase text-slate-500 font-semibold">
+                        Cumulative Semester Attendance
+                      </div>
+                      <div className="text-2xl font-bold font-mono text-emerald-600 tabular-nums">
+                        88.5%
+                      </div>
+                      <div className="text-2xs text-slate-500 mt-0.5">Above mandatory 75% threshold</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-full border-4 border-emerald-500 flex items-center justify-center font-bold text-xs text-emerald-700 bg-white">
+                      Safe
+                    </div>
                   </div>
-                  <span className="font-mono text-2xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                    {c.time}
-                  </span>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="font-semibold text-slate-700">Today's Class Timetable</div>
+                    {[
+                      { time: '09:00 - 10:30', course: 'CS301: Advanced Data Structures & Algorithms', hall: 'Lecture Hall 102' },
+                      { time: '11:00 - 12:30', course: 'CS304: Computer Networks & Socket Programming', hall: 'Lab 4 (Systems Wing)' },
+                      { time: '14:30 - 16:00', course: 'CS309: Cloud & Distributed Operating Systems', hall: 'Seminar Room B' },
+                    ].map((c, i) => (
+                      <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-md flex justify-between items-center">
+                        <div>
+                          <div className="font-medium text-slate-900">{c.course}</div>
+                          <div className="text-2xs text-slate-500">{c.hall}</div>
+                        </div>
+                        <span className="font-mono text-2xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                          {c.time}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-900">
-              Zero-Queue Clearance & No-Dues Certificate
-            </h2>
-            <p className="text-xs text-slate-500">
-              Digital automated reconciliation across hostel, central library, laboratory, and accounts departments.
-            </p>
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Quick Academic Services
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    One-click access to academic evaluations, certificates, and institutional clearances.
+                  </p>
 
-            <div className="space-y-2 text-xs">
-              {[
-                { dept: 'Hostel Maintenance & Mess Fee', status: 'Cleared (Nil)', verified: true },
-                { dept: 'Central University Library', status: 'Cleared (0 Books Overdue)', verified: true },
-                { dept: 'Computer Science Department Lab', status: 'Equipment Returned', verified: true },
-                { dept: 'Sports Equipment & Gym Store', status: 'No Active Borrows', verified: true },
-              ].map((d, i) => (
-                <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="font-medium text-slate-800">{d.dept}</span>
-                  <span className="text-emerald-700 font-medium flex items-center gap-1 text-2xs">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {d.status}
-                  </span>
+                  <div className="grid grid-cols-1 gap-3">
+                    <button
+                      onClick={() => setAcademicSubTab('certificates')}
+                      className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-left transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
+                          <Award className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            Request No-Due & Bonafide Certificates
+                          </div>
+                          <div className="text-2xs text-slate-500">
+                            5/5 Departments cleared · Ready for instant download
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-emerald-700">Open &rarr;</span>
+                    </button>
+
+                    <button
+                      onClick={() => setAcademicSubTab('marks')}
+                      className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-left transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
+                          <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            Subject Marksheet & Continuous Evaluation
+                          </div>
+                          <div className="text-2xs text-slate-500">
+                            Internals, Semester, Quiz & Surprise Test marks
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-indigo-700">Open &rarr;</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-2xs text-slate-600 space-y-1">
+                    <div className="font-semibold text-slate-800">Need exam or syllabus assistance?</div>
+                    <div>Contact the Department Academic Advisor at <span className="font-mono text-indigo-600">advisor.cse@bput.ac.in</span></div>
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
-
-            <button
-              onClick={() => alert('Digital Signed No-Dues Certificate verified! PDF generated with university cryptographic seal.')}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer text-center"
-            >
-              Download Provisional No-Dues Certificate (PDF)
-            </button>
-          </div>
+          )}
         </div>
       )}
 

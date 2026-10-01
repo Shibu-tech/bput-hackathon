@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCampusOps } from '../context/CampusOpsContext';
 import { emergencySound } from '../utils/audioAlert';
-import { ShieldAlert, Volume2, CheckCircle2, X, AlertTriangle, Users, MapPin } from 'lucide-react';
+import { ShieldAlert, Volume2, VolumeX, CheckCircle2, X, AlertTriangle, Users, MapPin, BellOff } from 'lucide-react';
 
 interface EmergencyAlertModalProps {
   isOpen: boolean;
@@ -30,14 +30,24 @@ export const EmergencyAlertModal: React.FC<EmergencyAlertModalProps> = ({
   const [musterPoint, setMusterPoint] = useState('Main Athletics Track & Football Field (Zone A)');
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
 
-  if (!isOpen && !activeEmergency) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleTrigger = () => {
     triggerEmergencyAlert(selectedType, customTitle, customMessage, musterPoint);
   };
 
   const handlePlayTestSound = () => {
-    emergencySound.playAmbulanceSiren(3);
+    emergencySound.playAmbulanceSiren(6);
   };
 
   const handleStudentCheckIn = () => {
@@ -45,8 +55,20 @@ export const EmergencyAlertModal: React.FC<EmergencyAlertModalProps> = ({
     setHasCheckedIn(true);
   };
 
+  const handleTurnOffAlert = () => {
+    emergencySound.stop();
+    dismissEmergencyAlert();
+    setHasCheckedIn(false);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+    >
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border-2 border-red-500">
 
         {/* Header with High-Contrast Red Strobe/Alert Bar */}
@@ -58,16 +80,28 @@ export const EmergencyAlertModal: React.FC<EmergencyAlertModalProps> = ({
                 {activeEmergency ? 'CRITICAL CAMPUS EMERGENCY ALERT' : 'Emergency Siren & Evacuation Console'}
               </h2>
               <p className="text-xs text-red-100">
-                Loud ambulance override siren (3s audio burst) · Mute bypass protocol
+                Loud ambulance override siren (6s audio burst) · Mute bypass protocol
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-red-100 hover:text-white p-1 rounded-md cursor-pointer transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {activeEmergency && (
+              <button
+                onClick={handleTurnOffAlert}
+                title="Turn off this emergency alert broadcast"
+                className="text-xs font-bold bg-white text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded cursor-pointer transition-colors shadow-xs"
+              >
+                Turn Off Alert
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Close emergency modal"
+              className="text-red-100 hover:text-white p-1 rounded-md cursor-pointer transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -128,35 +162,67 @@ export const EmergencyAlertModal: React.FC<EmergencyAlertModalProps> = ({
                 )}
               </div>
 
-              {/* Siren Control buttons */}
-              <div className="flex items-center justify-between pt-2">
+              {/* Emergency Alert Active Notice with Turn Off Button */}
+              <div className="p-3.5 bg-red-100/90 border border-red-300 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-xs font-bold text-red-950">
+                  <BellOff className="w-4 h-4 text-red-700 shrink-0" />
+                  <span>
+                    Emergency Alert is currently active across the campus.
+                  </span>
+                </div>
                 <button
-                  onClick={handlePlayTestSound}
-                  className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 px-3 py-1.5 border border-slate-200 rounded-md cursor-pointer"
+                  onClick={handleTurnOffAlert}
+                  className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-colors shrink-0"
                 >
-                  <Volume2 className="w-4 h-4 text-amber-600" />
-                  Replay Siren (3s)
+                  <BellOff className="w-4 h-4" />
+                  Turn Off Alert Message
                 </button>
+              </div>
 
-                {(role === 'warden' || role === 'guard') && (
+              {/* Siren Control and Close buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      dismissEmergencyAlert();
-                      setHasCheckedIn(false);
-                      onClose();
-                    }}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-lg cursor-pointer transition-colors"
+                    onClick={handlePlayTestSound}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-2 border border-amber-300 rounded-md cursor-pointer transition-colors"
                   >
-                    All-Clear / End Emergency
+                    <Volume2 className="w-4 h-4 text-amber-600" />
+                    Replay Siren (6s)
                   </button>
-                )}
+
+                  <button
+                    onClick={() => emergencySound.stop()}
+                    className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-red-700 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-md cursor-pointer transition-colors"
+                    title="Stop emergency siren audio immediately"
+                  >
+                    <VolumeX className="w-4 h-4 text-red-500" />
+                    Stop Siren Audio
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg cursor-pointer transition-colors"
+                  >
+                    Close Console
+                  </button>
+
+                  <button
+                    onClick={handleTurnOffAlert}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <BellOff className="w-4 h-4" />
+                    Turn Off Alert Message
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
             /* Emergency Broadcast Trigger Interface for Wardens/Admins */
             <div className="space-y-4">
               <div className="text-xs text-slate-600 leading-relaxed bg-amber-50 border border-amber-200 p-3 rounded-md">
-                <strong>Protocol Note (Fretbox PRD Spec):</strong> Activating this alert sends a critical push notification that activates the device audio synthesizer to ring like an ambulance for 3 seconds, bypassing quiet hours.
+                <strong>Protocol Note (Fretbox PRD Spec):</strong> Activating this alert sends a critical push notification that activates the device audio synthesizer to ring like an ambulance for 6 seconds, bypassing quiet hours.
               </div>
 
               <div>
@@ -236,7 +302,7 @@ export const EmergencyAlertModal: React.FC<EmergencyAlertModalProps> = ({
                   className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 px-3 py-2 border border-slate-200 rounded-md cursor-pointer transition-colors"
                 >
                   <Volume2 className="w-4 h-4 text-amber-600" />
-                  Test Siren Audio (3s)
+                  Test Siren Audio (6s)
                 </button>
 
                 <div className="flex items-center gap-2">

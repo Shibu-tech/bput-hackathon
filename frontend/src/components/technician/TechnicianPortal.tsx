@@ -24,6 +24,7 @@ import {
   RotateCcw,
   ShieldAlert,
 } from 'lucide-react';
+import { formatTaskTime } from '../../utils/timeFormat';
 
 interface CategoryConfig {
   id: ComplaintCategory;
@@ -572,7 +573,9 @@ export const TechnicianPortal: React.FC = () => {
                           {rm}
                         </span>
                       ))}
-                      <span className="ml-auto font-mono text-purple-700 font-semibold">{dt.detectedAt}</span>
+                      <span className="ml-auto font-mono text-3xs text-purple-800 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded font-semibold">
+                        Cluster Logged: {formatTaskTime(dt.detectedAt) || dt.detectedAt}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -919,6 +922,11 @@ const TicketCard: React.FC<TicketCardProps> = ({
     low: 'bg-slate-400 text-white',
   };
 
+  const createdTime = formatTaskTime(c.createdAt) || 'Recent';
+  const assignedTime = c.assignedAt ? formatTaskTime(c.assignedAt) : null;
+  const resolvedTime = c.resolvedAt ? formatTaskTime(c.resolvedAt) : null;
+  const rejectedTime = c.rejectedAt ? formatTaskTime(c.rejectedAt) : null;
+
   return (
     <div
       className={`border rounded-xl p-4 space-y-3 shadow-xs transition-all ${
@@ -982,6 +990,105 @@ const TicketCard: React.FC<TicketCardProps> = ({
         </div>
       </div>
 
+      {/* Task Lifecycle Timestamps Grid (Created, Assigned, Resolved/Rejected) */}
+      <div className="bg-slate-50/90 rounded-lg p-2.5 border border-slate-200/90 space-y-2">
+        <div className="flex items-center justify-between text-3xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200/70 pb-1">
+          <span className="flex items-center gap-1 text-slate-600">
+            <Clock className="w-3 h-3 text-slate-500" />
+            Task Activity Timestamps
+          </span>
+          <span className="font-mono text-3xs text-slate-400">
+            {isResolved
+              ? 'Resolved'
+              : isRejected
+              ? 'Rejected'
+              : c.status === 'in_progress'
+              ? 'In Progress'
+              : c.status === 'assigned'
+              ? 'Assigned'
+              : 'Open Requisition'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {/* 1. Created Time */}
+          <div className="bg-white p-2 rounded border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center gap-1 text-3xs font-semibold text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>
+              <span>Task Created</span>
+            </div>
+            <div className="font-mono text-2xs font-bold text-slate-800 mt-1">
+              {createdTime}
+            </div>
+            <div className="text-3xs text-slate-400 mt-0.5 truncate">
+              By {c.studentName}
+            </div>
+          </div>
+
+          {/* 2. Assigned Time */}
+          <div className="bg-white p-2 rounded border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center gap-1 text-3xs font-semibold text-slate-500">
+              <span
+                className={`w-1.5 h-1.5 rounded-full inline-block ${
+                  assignedTime ? 'bg-indigo-500' : 'bg-amber-400'
+                }`}
+              ></span>
+              <span>Task Assigned</span>
+            </div>
+            <div className="font-mono text-2xs font-bold mt-1">
+              {assignedTime ? (
+                <span className="text-indigo-900">{assignedTime}</span>
+              ) : (
+                <span className="text-amber-600 font-normal italic">Pending Assignment</span>
+              )}
+            </div>
+            <div className="text-3xs text-slate-400 mt-0.5 truncate">
+              {c.assignedTo ? c.assignedTo : 'Awaiting Warden'}
+            </div>
+          </div>
+
+          {/* 3. Resolved / Rejected Time */}
+          <div className="bg-white p-2 rounded border border-slate-200/80 shadow-2xs">
+            <div className="flex items-center gap-1 text-3xs font-semibold text-slate-500">
+              <span
+                className={`w-1.5 h-1.5 rounded-full inline-block ${
+                  isResolved
+                    ? 'bg-emerald-500'
+                    : isRejected
+                    ? 'bg-rose-500'
+                    : 'bg-slate-300'
+                }`}
+              ></span>
+              <span>
+                {isResolved
+                  ? 'Task Resolved'
+                  : isRejected
+                  ? 'Task Rejected'
+                  : 'Resolution'}
+              </span>
+            </div>
+            <div className="font-mono text-2xs font-bold mt-1">
+              {isResolved && resolvedTime ? (
+                <span className="text-emerald-700">{resolvedTime}</span>
+              ) : isRejected && rejectedTime ? (
+                <span className="text-rose-700">{rejectedTime}</span>
+              ) : (
+                <span className="text-slate-400 font-normal italic">
+                  {c.status === 'in_progress' ? 'In Progress' : 'Pending Resolution'}
+                </span>
+              )}
+            </div>
+            <div className="text-3xs text-slate-400 mt-0.5 truncate">
+              {isResolved
+                ? c.resolvedBy || c.assignedTo || 'Duty Tech'
+                : isRejected
+                ? c.rejectedBy || c.assignedTo || 'Duty Tech'
+                : 'Awaiting Action'}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Pending Warden Dispatch Banner */}
       {!c.assignedTo && !c.assignedBy && c.status === 'open' && (
         <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-lg text-2xs text-amber-900 space-y-0.5">
@@ -1008,7 +1115,11 @@ const TicketCard: React.FC<TicketCardProps> = ({
               <UserCheck className="w-3 h-3 text-indigo-600" />
               {c.assignedBy ? `Assigned by Warden: ${c.assignedBy}` : `Assigned Tech: ${c.assignedTo}`}
             </span>
-            {c.assignedAt && <span className="font-mono text-3xs text-indigo-500">{c.assignedAt}</span>}
+            {assignedTime && (
+              <span className="font-mono text-3xs text-indigo-700 bg-indigo-100 border border-indigo-200 px-1.5 py-0.2 rounded font-semibold">
+                Assigned: {assignedTime}
+              </span>
+            )}
           </div>
           {c.assignedTo && c.assignedBy && (
             <div className="text-3xs text-indigo-700">
@@ -1031,7 +1142,9 @@ const TicketCard: React.FC<TicketCardProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               Resolved by {c.resolvedBy || c.assignedTo || 'Technician'}
             </span>
-            <span className="font-mono text-3xs text-emerald-600">{c.resolvedAt}</span>
+            <span className="font-mono text-3xs text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold">
+              Resolved: {resolvedTime || 'Completed'}
+            </span>
           </div>
           {c.resolutionNotes && (
             <p className="text-emerald-800 text-2xs bg-white/70 p-1.5 rounded border border-emerald-100">
@@ -1049,7 +1162,9 @@ const TicketCard: React.FC<TicketCardProps> = ({
               <XCircle className="w-3.5 h-3.5 text-rose-600" />
               Flagged/Rejected by {c.rejectedBy || c.assignedTo || 'Technician'}
             </span>
-            <span className="font-mono text-3xs text-rose-600">{c.rejectedAt}</span>
+            <span className="font-mono text-3xs text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.2 rounded font-semibold">
+              Rejected: {rejectedTime || 'Rejected'}
+            </span>
           </div>
           {c.rejectionReason && (
             <p className="text-rose-800 text-2xs bg-white/70 p-1.5 rounded border border-rose-100">
@@ -1063,8 +1178,8 @@ const TicketCard: React.FC<TicketCardProps> = ({
       {/* Actions */}
       {isActionable && (
         <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-          <div className="text-3xs text-slate-400 font-mono">
-            Reported: {c.createdAt}
+          <div className="text-3xs text-slate-500 font-mono">
+            Created: {createdTime}
           </div>
 
           <div className="flex items-center gap-2">
