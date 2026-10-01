@@ -1,13 +1,15 @@
 /**
  * Emergency Alert Audio Synthesizer
  * Synthesizes an authoritative ambulance / emergency sweep siren using Web Audio API
- * Runs for 3 seconds as mandated by the Campus Operations specification.
+ * Runs for 6 seconds as requested for emergency alerting.
  */
 
 class EmergencySoundSynthesizer {
   private audioCtx: AudioContext | null = null;
   private isRinging: boolean = false;
   private timer: number | null = null;
+  private activeOsc: OscillatorNode | null = null;
+  private activeGain: GainNode | null = null;
 
   private initContext() {
     if (!this.audioCtx) {
@@ -19,7 +21,7 @@ class EmergencySoundSynthesizer {
     }
   }
 
-  public playAmbulanceSiren(durationSeconds: number = 3, onEnded?: () => void) {
+  public playAmbulanceSiren(durationSeconds: number = 6, onEnded?: () => void) {
     try {
       this.initContext();
       if (!this.audioCtx) return;
@@ -30,7 +32,7 @@ class EmergencySoundSynthesizer {
       // Trigger hardware vibration if mobile device supports it
       if ('vibrate' in navigator) {
         try {
-          navigator.vibrate([400, 150, 400, 150, 400, 150, 600]);
+          navigator.vibrate([400, 150, 400, 150, 400, 150, 600, 150, 400, 150, 400]);
         } catch {
           // Ignore vibration permissions restrictions
         }
@@ -39,6 +41,9 @@ class EmergencySoundSynthesizer {
       const now = this.audioCtx.currentTime;
       const osc = this.audioCtx.createOscillator();
       const gainNode = this.audioCtx.createGain();
+
+      this.activeOsc = osc;
+      this.activeGain = gainNode;
 
       osc.type = 'sawtooth';
 
@@ -53,7 +58,7 @@ class EmergencySoundSynthesizer {
         osc.frequency.exponentialRampToValueAtTime(740, cycleStart + cycleTime);
       }
 
-      // Gain envelope: fast attack, steady full volume, quick fade at end of 3s
+      // Gain envelope: fast attack, steady full volume, quick fade at end of duration
       gainNode.gain.setValueAtTime(0.01, now);
       gainNode.gain.exponentialRampToValueAtTime(0.75, now + 0.08);
       gainNode.gain.setValueAtTime(0.75, now + durationSeconds - 0.15);
@@ -67,6 +72,8 @@ class EmergencySoundSynthesizer {
 
       this.timer = window.setTimeout(() => {
         this.isRinging = false;
+        this.activeOsc = null;
+        this.activeGain = null;
         if (onEnded) onEnded();
       }, durationSeconds * 1000);
 
@@ -82,6 +89,23 @@ class EmergencySoundSynthesizer {
       this.timer = null;
     }
     this.isRinging = false;
+    if (this.activeOsc) {
+      try {
+        this.activeOsc.stop();
+        this.activeOsc.disconnect();
+      } catch {
+        // Safe ignore
+      }
+      this.activeOsc = null;
+    }
+    if (this.activeGain) {
+      try {
+        this.activeGain.disconnect();
+      } catch {
+        // Safe ignore
+      }
+      this.activeGain = null;
+    }
     if (this.audioCtx && this.audioCtx.state === 'running') {
       try {
         this.audioCtx.suspend();
@@ -93,3 +117,31 @@ class EmergencySoundSynthesizer {
 }
 
 export const emergencySound = new EmergencySoundSynthesizer();
+
+/**
+ * Synthesizes a crisp electronic POS barcode / QR scanner confirmation beep
+ */
+export const playScannerBeep = () => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2400, ctx.currentTime);
+
+    gain.gain.setValueAtTime(0.01, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+  } catch {
+    // Ignore audio permission restrictions
+  }
+};

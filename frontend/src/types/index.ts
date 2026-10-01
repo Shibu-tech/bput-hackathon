@@ -1,6 +1,6 @@
 export type UserRole = 'student' | 'warden' | 'technician' | 'guard' | 'mess' | 'kiosk' | 'admin';
 
-export type Language = 'en' | 'hi' | 'te' | 'ta' | 'mr';
+export type Language = 'en' | 'or' | 'hi';
 
 export type PassType = 'day' | 'late_night' | 'weekend_leave' | 'emergency';
 export type PassStatus = 'pending' | 'approved' | 'rejected' | 'checked_out' | 'completed' | 'overdue';
@@ -201,5 +201,78 @@ export interface StaffRegistrationRequest {
   verifiedAt?: string | number;
   verificationNotes?: string;
   verifiedBy?: string;
+}
+
+// ==========================================
+// ACADEMIC & CERTIFICATE TYPES
+// ==========================================
+
+export type CertificateType = 'no_due' | 'bonafide';
+export type CertificateStatus = 'approved' | 'pending' | 'rejected';
+
+export interface ClearanceItem {
+  department: string;
+  status: string;
+  verified: boolean;
+  clearedBy: string;
+  clearedDate: string;
+  remarks: string;
+}
+
+export interface CertificateRequest {
+  id: string;
+  certificateNumber: string;
+  type: CertificateType;
+  studentName: string;
+  rollNumber: string;
+  branch: string;
+  academicYear: string;
+  semester: string;
+  purpose: string;
+  urgent?: boolean;
+  requestDate: string;
+  status: CertificateStatus;
+  approvedDate?: string;
+  approvedBy?: string;
+  qrCodeToken?: string;
+  clearanceDetails?: ClearanceItem[];
+  remarks?: string;
+}
+
+export interface SubjectMark {
+  subjectCode: string;
+  subjectName: string;
+  credits: number;
+  facultyName: string;
+  category: 'Core Theory' | 'Professional Elective' | 'Basic Sciences' | 'Laboratory / Practical';
+  // Marks components explicitly requested: internals, semester, quiz, surprise test
+  quizScore: number;
+  quizMax: number;
+  surpriseTestScore: number;
+  surpriseTestMax: number;
+  internalScore: number;
+  internalMax: number;
+  semesterScore: number;
+  semesterMax: number;
+  // Computed / aggregated
+  totalScore: number;
+  totalMax: number;
+  grade: 'O' | 'E' | 'A' | 'B' | 'C' | 'D' | 'F';
+  gradePoint: number;
+  status: 'PASS' | 'FAIL' | 'ABSENT';
+}
+
+export interface SemesterMarksheet {
+  semesterId: string;
+  semesterName: string;
+  academicYear: string;
+  branch: string;
+  sgpa: number;
+  cgpa: number;
+  totalCredits: number;
+  earnedCredits: number;
+  publishedDate: string;
+  resultStatus: 'Passed with Distinction' | 'Passed' | 'Result Withheld';
+  subjects: SubjectMark[];
 }
 

@@ -103,7 +103,7 @@ export const RolloutAdoptionPlaybook: React.FC = () => {
                   },
                   {
                     phase: 'Phase 2: Grassroots Staff Onboarding with Regional UI (Days 4–7)',
-                    desc: 'Train security guards and technicians using their native language interfaces (Hindi, Telugu, Tamil, Marathi). Remove all typing—actions are strictly 1-touch QR scans or code verifications.',
+                    desc: 'Train security guards and technicians using their native language interfaces (Odia, Hindi, English). Remove all typing—actions are strictly 1-touch QR scans or code verifications.',
                   },
                   {
                     phase: 'Phase 3: Physical Friction Removal via Door QR Kits (Week 2)',
@@ -253,7 +253,7 @@ export const RolloutAdoptionPlaybook: React.FC = () => {
                 day: 'Day 1: Security Guards',
                 focus: 'Gate Verification & Offline Scanning',
                 topics: [
-                  'Using native language interface (Hindi / Telugu / Tamil)',
+                  'Using native language interface (Odia / Hindi / English)',
                   'One-touch Exit and Entry logging',
                   'Handling students with uncharged phones via Kiosk Slip',
                 ],
