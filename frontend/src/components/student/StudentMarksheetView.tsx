@@ -178,8 +178,18 @@ const buildSemesterMarksheets = (
       });
 
       // Find specific exam types if separate
-      const quizMs = msList.find((m) => m.examType === 'Assignment / Quiz');
-      const surpriseMs = msList.find((m) => m.examType.toLowerCase().includes('surprise'));
+      const quizMs = msList.find(
+        (m) =>
+          m.examType === 'Assignment / Quiz' ||
+          m.examType === 'Surprise Test/Quiz' ||
+          m.examType.toLowerCase().includes('quiz')
+      );
+      const surpriseMs = msList.find(
+        (m) =>
+          m.examType === 'Surprise Test' ||
+          m.examType === 'Surprise Test/Quiz' ||
+          m.examType.toLowerCase().includes('surprise')
+      );
       const internalMs = msList.find(
         (m) =>
           m.examType === 'Internal Assessment 1' ||

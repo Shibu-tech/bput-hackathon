@@ -1617,11 +1617,9 @@ export const FacultyDashboard: React.FC = () => {
                     className="w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white font-medium cursor-pointer focus:outline-none"
                   >
                     <option value="Semester Exam">Semester Exam</option>
-                    <option value="Semester">Semester</option>
                     <option value="Internal Assessment 1">Internal 1</option>
                     <option value="Internal Assessment 2">Internal 2</option>
-                    <option value="Surprise Test">Surprise Test</option>
-                    <option value="Assignment / Quiz">Assignment / Quiz</option>
+                    <option value="Surprise Test/Quiz">Surprise Test/Quiz</option>
                     <option value="Practical / Lab Exam">Lab / Practical</option>
                   </select>
                 </div>
