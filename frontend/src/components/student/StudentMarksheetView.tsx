@@ -187,7 +187,12 @@ const buildSemesterMarksheets = (
           m.examType === 'Mid Term'
       );
       const endSemMs = msList.find(
-        (m) => m.examType === 'End Term' || m.examType === 'Practical / Lab Exam'
+        (m) =>
+          m.examType === 'Semester Exam' ||
+          m.examType === 'Semester' ||
+          m.examType === 'End Term' ||
+          m.examType === 'Practical / Lab Exam' ||
+          m.examType.toLowerCase().includes('semester')
       );
 
       let quizScore = 0;
@@ -278,8 +283,8 @@ const buildSemesterMarksheets = (
       const category: 'Core Theory' | 'Basic Sciences' | 'Laboratory / Practical' = isLab
         ? 'Laboratory / Practical'
         : isScience
-        ? 'Basic Sciences'
-        : 'Core Theory';
+          ? 'Basic Sciences'
+          : 'Core Theory';
 
       subjects.push({
         subjectCode,
@@ -313,10 +318,10 @@ const buildSemesterMarksheets = (
       subjects.length === 0
         ? 'Result Withheld'
         : failCount === 0
-        ? sgpa >= 8.5
-          ? 'Passed with Distinction'
-          : 'Passed'
-        : 'Result Withheld';
+          ? sgpa >= 8.5
+            ? 'Passed with Distinction'
+            : 'Passed'
+          : 'Result Withheld';
 
     return {
       semesterId: term.semesterId,
@@ -638,9 +643,9 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
               SEM
             </div>
             <div>
-              <div className="text-2xs font-semibold text-emerald-900">End Semester (Max 50)</div>
+              <div className="text-2xs font-semibold text-emerald-900">End Semester (Max 100)</div>
               <div className="text-xs text-emerald-700 font-medium">
-                Your Avg: <span className="font-bold font-mono">{avgSemester}</span> / 50
+                Your Avg: <span className="font-bold font-mono">{avgSemester}</span> / 100
               </div>
             </div>
           </div>
@@ -804,11 +809,10 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
                       {/* Result Status */}
                       <td className="py-3.5 px-4 text-center">
                         <span
-                          className={`inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full border ${
-                            sub.status === 'PASS'
+                          className={`inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full border ${sub.status === 'PASS'
                               ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                               : 'text-rose-700 bg-rose-50 border-rose-200'
-                          }`}
+                            }`}
                         >
                           {sub.status === 'PASS' ? (
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />

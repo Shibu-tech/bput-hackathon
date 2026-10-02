@@ -85,7 +85,7 @@ export const FacultyDashboard: React.FC = () => {
   // --- MARKS FORM STATE ---
   const [marksSubject, setMarksSubject] = useState('Database Management Systems');
   const [marksSubjectCode, setMarksSubjectCode] = useState('CS-402');
-  const [marksExamType, setMarksExamType] = useState('Mid Term');
+  const [marksExamType, setMarksExamType] = useState('Semester Exam');
   const [marksBatch, setMarksBatch] = useState('2024');
   const [marksSemester, setMarksSemester] = useState('Semester 4');
   const [marksMax, setMarksMax] = useState<number>(100);
@@ -1569,7 +1569,7 @@ export const FacultyDashboard: React.FC = () => {
 
             <form onSubmit={handleSaveMarksheet} className="space-y-4">
               {/* Exam & Subject Parameters */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3 text-xs">
                 <div className="col-span-2">
                   <label className="block font-bold text-slate-700 mb-1">Subject / Course Name</label>
                   <input
@@ -1592,18 +1592,37 @@ export const FacultyDashboard: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block font-bold text-slate-700 mb-1">Semester</label>
+                  <select
+                    value={marksSemester}
+                    onChange={(e) => setMarksSemester(e.target.value)}
+                    className="w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white font-medium cursor-pointer focus:outline-none"
+                  >
+                    <option value="Semester 1">Semester 1</option>
+                    <option value="Semester 2">Semester 2</option>
+                    <option value="Semester 3">Semester 3</option>
+                    <option value="Semester 4">Semester 4</option>
+                    <option value="Semester 5">Semester 5</option>
+                    <option value="Semester 6">Semester 6</option>
+                    <option value="Semester 7">Semester 7</option>
+                    <option value="Semester 8">Semester 8</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-bold text-slate-700 mb-1">Exam Type</label>
                   <select
                     value={marksExamType}
                     onChange={(e) => setMarksExamType(e.target.value)}
                     className="w-full px-2.5 py-2 border border-slate-300 rounded-lg bg-white font-medium cursor-pointer focus:outline-none"
                   >
+                    <option value="Semester Exam">Semester Exam</option>
+                    <option value="Semester">Semester</option>
                     <option value="Internal Assessment 1">Internal 1</option>
                     <option value="Internal Assessment 2">Internal 2</option>
-                    <option value="Mid Term">Mid Term</option>
-                    <option value="End Term">End Term Exam</option>
-                    <option value="Practical / Lab Exam">Lab / Practical</option>
+                    <option value="Surprise Test">Surprise Test</option>
                     <option value="Assignment / Quiz">Assignment / Quiz</option>
+                    <option value="Practical / Lab Exam">Lab / Practical</option>
                   </select>
                 </div>
 
