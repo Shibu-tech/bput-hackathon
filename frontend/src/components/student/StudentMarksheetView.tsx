@@ -119,6 +119,7 @@ const buildSemesterMarksheets = (
   facultyMarks: FacultyMarksheet[],
   studentName: string,
   studentRoll: string,
+  branch: string = 'B.Tech - Computer Science & Engineering',
   userId?: string
 ): SemesterMarksheet[] => {
   const termMap = new Map<string, BaseTerm>();
@@ -308,13 +309,20 @@ const buildSemesterMarksheets = (
     const sgpa = totalCredits > 0 ? Number((totalPoints / totalCredits).toFixed(2)) : 0;
     const cgpa = sgpa;
     const failCount = subjects.filter((s) => s.status === 'FAIL').length;
-    const resultStatus: 'PASS' | 'PROMOTED' | 'FAIL' =
-      subjects.length === 0 ? 'PASS' : failCount === 0 ? 'PASS' : failCount <= 2 ? 'PROMOTED' : 'FAIL';
+    const resultStatus: 'Passed with Distinction' | 'Passed' | 'Result Withheld' =
+      subjects.length === 0
+        ? 'Result Withheld'
+        : failCount === 0
+        ? sgpa >= 8.5
+          ? 'Passed with Distinction'
+          : 'Passed'
+        : 'Result Withheld';
 
     return {
       semesterId: term.semesterId,
       semesterName: term.semesterName,
       academicYear: term.academicYear,
+      branch,
       totalCredits,
       earnedCredits,
       sgpa,
@@ -396,19 +404,20 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
 
   // Transform faculty marks dynamically using the student credentials
   const marksheets: SemesterMarksheet[] = React.useMemo(() => {
-    return buildSemesterMarksheets(facultyMarks, studentName, studentRoll, userId);
-  }, [facultyMarks, studentName, studentRoll, userId]);
+    return buildSemesterMarksheets(facultyMarks, studentName, studentRoll, branch, userId);
+  }, [facultyMarks, studentName, studentRoll, branch, userId]);
 
   const activeMarksheet: SemesterMarksheet =
     marksheets.find((m) => m.semesterId === selectedSemId) || marksheets[0] || {
       semesterId: 'sem-5',
       semesterName: 'Semester 5 (Current Autumn 2024)',
       academicYear: '2024-2025',
+      branch,
       totalCredits: 0,
       earnedCredits: 0,
       sgpa: 0,
       cgpa: 0,
-      resultStatus: 'PASS',
+      resultStatus: 'Result Withheld',
       publishedDate: 'Awaiting Publication',
       subjects: [],
     };
@@ -1088,7 +1097,7 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
               <div className="font-sans flex flex-col sm:flex-row items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs gap-3">
                 <div>
                   Result:{' '}
-                  <strong className={activeMarksheet.resultStatus === 'PASS' ? 'text-emerald-700' : 'text-amber-700'}>
+                  <strong className={activeMarksheet.resultStatus.startsWith('Pass') ? 'text-emerald-700' : 'text-amber-700'}>
                     {hasSubjects ? activeMarksheet.resultStatus : 'Awaiting Publication'}
                   </strong>
                 </div>

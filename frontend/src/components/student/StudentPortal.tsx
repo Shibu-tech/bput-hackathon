@@ -1447,7 +1447,7 @@ export const StudentPortal: React.FC = () => {
               <StudentMarksheetView
                 studentName={studentDisplayName}
                 studentRoll={studentRoll}
-                userId={user?._id || user?.id}
+                userId={user?.id}
                 initialMarks={academicMarks}
                 onRefresh={fetchAcademics}
               />
