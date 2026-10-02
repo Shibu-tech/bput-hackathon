@@ -9,7 +9,6 @@ import { TechnicianPortal } from './technician/TechnicianPortal';
 import { SecurityGuardTerminal } from './guard/SecurityGuardTerminal';
 import { MessCafeteriaPortal } from './mess/MessCafeteriaPortal';
 import { SelfServiceKiosk } from './kiosk/SelfServiceKiosk';
-import { RolloutAdoptionPlaybook } from './adoption/RolloutAdoptionPlaybook';
 import { AdminPortal } from './admin/AdminPortal';
 import { StaffVerificationModal } from './admin/StaffVerificationModal';
 import { FacultyDashboard } from './faculty/FacultyDashboard';
@@ -50,29 +49,21 @@ const MainLayout: React.FC = () => {
   const [isStaffModalOpen, setIsStaffModalOpen] =
     useState(false);
 
-  const [activeView, setActiveView] =
-    useState<string>('main');
-
   return (
     <div
       id="dashboard-root"
       className={`min-h-screen flex flex-col ${lowDataMode
-          ? 'bg-amber-50/30'
-          : 'bg-slate-50'
+        ? 'bg-amber-50/30'
+        : 'bg-slate-50'
         }`}
     >
       <Header
         onOpenEmergencyModal={() =>
           setIsEmergencyModalOpen(true)
         }
-        onOpenAdoptionPlaybook={() =>
-          setActiveView('adoption')
-        }
         onOpenStaffVerification={() =>
           setIsStaffModalOpen(true)
         }
-        activeView={activeView}
-        setActiveView={setActiveView}
         activeRole={activeRole}
         setActiveRole={setActiveRole}
         isSuperAdmin={isSuperAdmin}
@@ -119,30 +110,24 @@ const MainLayout: React.FC = () => {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeView === 'adoption' ? (
-          <RolloutAdoptionPlaybook />
-        ) : (
-          <>
-            {activeRole === 'student' && <StudentPortal />}
-            {activeRole === 'warden' && <WardenDashboard />}
-            {activeRole === 'technician' && (
-              <TechnicianPortal />
-            )}
-            {activeRole === 'guard' && (
-              <SecurityGuardTerminal />
-            )}
-            {activeRole === 'mess' && (
-              <MessCafeteriaPortal />
-            )}
-            {activeRole === 'kiosk' && (
-              <SelfServiceKiosk />
-            )}
-            {activeRole === 'admin' && <AdminPortal />}
-            {activeRole === 'faculty' && <FacultyDashboard />}
-            {!['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin', 'faculty'].includes(activeRole) && (
-              <StudentPortal />
-            )}
-          </>
+        {activeRole === 'student' && <StudentPortal />}
+        {activeRole === 'warden' && <WardenDashboard />}
+        {activeRole === 'technician' && (
+          <TechnicianPortal />
+        )}
+        {activeRole === 'guard' && (
+          <SecurityGuardTerminal />
+        )}
+        {activeRole === 'mess' && (
+          <MessCafeteriaPortal />
+        )}
+        {activeRole === 'kiosk' && (
+          <SelfServiceKiosk />
+        )}
+        {activeRole === 'admin' && <AdminPortal />}
+        {activeRole === 'faculty' && <FacultyDashboard />}
+        {!['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin', 'faculty'].includes(activeRole) && (
+          <StudentPortal />
         )}
       </main>
 
@@ -150,17 +135,17 @@ const MainLayout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-800">
-              FretOps Central
+              Sahaj
             </span>
 
             <span aria-hidden="true">·</span>
 
             <span>
-              Zero-Queue Campus & Hostel Operations Platform
+              Campus Life, Debugged
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* <div className="flex items-center gap-4">
             <button
               onClick={() => {
                 if (
@@ -182,7 +167,7 @@ const MainLayout: React.FC = () => {
             <span>
               Problem Statement 7 Implementation
             </span>
-          </div>
+          </div> */}
         </div>
       </footer>
 

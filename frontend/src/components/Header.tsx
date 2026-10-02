@@ -15,10 +15,7 @@ import {
 
 interface HeaderProps {
   onOpenEmergencyModal: () => void;
-  onOpenAdoptionPlaybook: () => void;
   onOpenStaffVerification?: () => void;
-  activeView: string;
-  setActiveView: (view: string) => void;
   activeRole: UserRole;
   setActiveRole: (role: UserRole) => void;
   isSuperAdmin: boolean;
@@ -26,10 +23,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenEmergencyModal,
-  onOpenAdoptionPlaybook,
   onOpenStaffVerification,
-  activeView,
-  setActiveView,
   activeRole,
   setActiveRole,
   isSuperAdmin,
@@ -62,7 +56,6 @@ export const Header: React.FC<HeaderProps> = ({
   const handleRoleChange = (newRole: UserRole) => {
     setActiveRole(newRole);
     setRole(newRole);
-    setActiveView('main');
   };
 
   const activeRoleLabel = roleOptions.find((r) => r.id === activeRole)?.label || activeRole;
@@ -74,17 +67,14 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Zone 1: Wordmark */}
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setActiveView('main')}
-              className="text-left group cursor-pointer focus-visible:outline-none"
-            >
-              <span className="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
+            <div className="text-left select-none">
+              <span className="text-xl font-bold tracking-tight text-slate-900">
                 FretOps
               </span>
               <span className="text-xs font-semibold text-indigo-600 ml-1.5 tracking-wider uppercase">
                 Central
               </span>
-            </button>
+            </div>
           </div>
 
           {/* Zone 2: Navigation Links / Role Dashboard Indicator */}
@@ -134,17 +124,6 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </button>
             )}
-
-            <button
-              onClick={onOpenAdoptionPlaybook}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ml-1 border ${
-                activeView === 'adoption'
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Rollout Playbook
-            </button>
           </nav>
 
           {/* Zone 3: Primary Actions, User Info & Logout */}
@@ -218,13 +197,9 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Mobile persona dropdown */}
             <div className="lg:hidden">
               <select
-                value={activeView === 'adoption' ? 'adoption' : activeRole}
+                value={activeRole}
                 onChange={(e) => {
-                  if (e.target.value === 'adoption') {
-                    onOpenAdoptionPlaybook();
-                  } else {
-                    handleRoleChange(e.target.value as UserRole);
-                  }
+                  handleRoleChange(e.target.value as UserRole);
                 }}
                 aria-label="Mobile Navigation"
                 className="text-xs bg-slate-900 text-white font-medium rounded-md px-2.5 py-1.5 focus:outline-none"
@@ -238,7 +213,6 @@ export const Header: React.FC<HeaderProps> = ({
                 ) : (
                   <option value={activeRole}>{activeRoleLabel}</option>
                 )}
-                <option value="adoption">Rollout Playbook</option>
               </select>
             </div>
           </div>
