@@ -12,6 +12,7 @@ import { SelfServiceKiosk } from './kiosk/SelfServiceKiosk';
 import { RolloutAdoptionPlaybook } from './adoption/RolloutAdoptionPlaybook';
 import { AdminPortal } from './admin/AdminPortal';
 import { StaffVerificationModal } from './admin/StaffVerificationModal';
+import { FacultyDashboard } from './faculty/FacultyDashboard';
 
 import {
   ShieldAlert,
@@ -118,7 +119,8 @@ const MainLayout: React.FC = () => {
               <SelfServiceKiosk />
             )}
             {activeRole === 'admin' && <AdminPortal />}
-            {!['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin'].includes(activeRole) && (
+            {activeRole === 'faculty' && <FacultyDashboard />}
+            {!['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin', 'faculty'].includes(activeRole) && (
               <StudentPortal />
             )}
           </>

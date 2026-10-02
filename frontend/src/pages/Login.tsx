@@ -14,6 +14,7 @@ import {
   Phone,
   ArrowRight,
   AlertCircle,
+  BookOpen,
 } from 'lucide-react';
 
 interface RoleConfig {
@@ -31,6 +32,13 @@ const ROLE_OPTIONS: RoleConfig[] = [
     description: 'Gate pass requests, room services, and attendance',
     icon: GraduationCap,
     badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
+  {
+    id: 'faculty',
+    label: 'Faculty / Staff',
+    description: 'Academic dashboard, notices, attendance, marks & study notes',
+    icon: BookOpen,
+    badgeColor: 'bg-violet-50 text-violet-700 border-violet-200',
   },
   {
     id: 'warden',

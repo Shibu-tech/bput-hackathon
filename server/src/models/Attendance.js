@@ -10,6 +10,10 @@ const attendanceSchema = new mongoose.Schema({
     type: String, // Format: "YYYY-MM-DD"
     required: true
   },
+  subject: {
+    type: String,
+    default: 'General'
+  },
   status: {
     type: String,
     enum: ['PRESENT', 'ABSENT', 'ON_LEAVE'],
@@ -24,7 +28,7 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Unique index on studentId and attDate
-attendanceSchema.index({ studentId: 1, attDate: 1 }, { unique: true });
+// Unique index on studentId, attDate and subject
+attendanceSchema.index({ studentId: 1, attDate: 1, subject: 1 }, { unique: true });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

@@ -56,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'mess', label: t.roles.mess },
     { id: 'kiosk', label: t.roles.kiosk },
     { id: 'admin', label: t.roles.admin },
+    { id: 'faculty', label: t.roles.faculty },
   ];
 
   const handleRoleChange = (newRole: UserRole) => {

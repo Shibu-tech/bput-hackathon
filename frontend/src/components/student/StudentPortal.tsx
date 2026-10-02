@@ -23,6 +23,10 @@ import {
   Sparkles,
   XCircle,
   RefreshCw,
+  BookOpen,
+  Download,
+  Award,
+  FileText,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
 
@@ -81,11 +85,31 @@ export const StudentPortal: React.FC = () => {
   const [reviewText, setReviewText] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
+  const [academicNotes, setAcademicNotes] = useState<any[]>([]);
+  const [academicMarks, setAcademicMarks] = useState<any[]>([]);
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
+    const fetchAcademics = async () => {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        const [nRes, mRes] = await Promise.all([
+          fetch('/api/notes', { headers }),
+          fetch('/api/marks', { headers }),
+        ]);
+        if (nRes.ok) {
+          const nData = await nRes.json();
+          setAcademicNotes(nData.data || []);
+        }
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          setAcademicMarks(mData.data || []);
+        }
+      } catch (e) {
+        console.warn('Academics fetch err:', e);
+      }
+    };
+    fetchAcademics();
   }, []);
 
   const { user } = useAuth();
@@ -1436,6 +1460,105 @@ export const StudentPortal: React.FC = () => {
             >
               Download Provisional No-Dues Certificate (PDF)
             </button>
+          </div>
+
+          {/* FACULTY STUDY NOTES & COURSEWARE */}
+          <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-900">Faculty Study Notes & Learning Materials</h3>
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">{academicNotes.length} Documents Available</span>
+            </div>
+
+            {academicNotes.length === 0 ? (
+              <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                No study notes published yet for your batch. Check back soon!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {academicNotes.map((note) => (
+                  <div key={note._id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-indigo-300 transition-all flex flex-col justify-between space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="px-1.5 py-0.5 rounded text-3xs font-extrabold uppercase bg-indigo-50 text-indigo-700">
+                          {note.category}
+                        </span>
+                        <span className="text-3xs text-slate-400 font-mono">{note.fileSize || 'PDF'}</span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900 leading-snug">{note.title}</h4>
+                      <p className="text-3xs text-slate-500 mt-0.5">{note.subject} · {note.semester}</p>
+                    </div>
+
+                    <a
+                      href={note.fileUrl}
+                      download={note.fileName}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-2xs transition-colors cursor-pointer mt-2"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Download File</span>
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* FACULTY PUBLISHED MARKS */}
+          <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Award className="w-4 h-4 text-purple-600" />
+                <h3 className="text-sm font-bold text-slate-900">Published Marksheets & Academic Grades</h3>
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">{academicMarks.length} Marksheets</span>
+            </div>
+
+            {academicMarks.length === 0 ? (
+              <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                No marks published yet for your semester examinations.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {academicMarks.map((m) => {
+                  const myRecord = m.records?.find((r: any) =>
+                    r.studentName?.toLowerCase() === studentDisplayName.toLowerCase() ||
+                    r.rollNumber === studentRoll
+                  );
+
+                  return (
+                    <div key={m._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xs font-extrabold uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                          {m.examType}
+                        </span>
+                        <span className="text-3xs text-slate-400 font-medium">Batch {m.batch}</span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900">{m.subject}</h4>
+                      <p className="text-2xs text-slate-500">{m.semester} · Max Marks: {m.maxMarks}</p>
+
+                      {myRecord ? (
+                        <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                          <span className="text-2xs font-bold text-slate-700">
+                            Score: <span className="text-indigo-600 text-xs">{myRecord.marksObtained}</span> / {m.maxMarks}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-2xs">
+                            Grade: {myRecord.grade || 'A'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-slate-200/80 text-3xs text-slate-400 italic">
+                          Class marksheet available (Passing marks: {m.passingMarks})
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

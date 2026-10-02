@@ -15,6 +15,8 @@ const {
   pushRoutes,
   locationRoutes,
   fileRoutes,
+  marksRoutes,
+  noteRoutes,
 } = require('./routes');
 
 const app = express();
@@ -52,6 +54,8 @@ app.use('/api/gate-passes', gatePassRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/mess', messRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/marks', marksRoutes);
+app.use('/api/notes', noteRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/locations', locationRoutes);
 

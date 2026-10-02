@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'warden' | 'technician' | 'guard' | 'mess' | 'kiosk' | 'admin';
+export type UserRole = 'student' | 'warden' | 'technician' | 'guard' | 'mess' | 'kiosk' | 'admin' | 'faculty';
 
 export type Language = 'en' | 'hi' | 'te' | 'ta' | 'mr';
 
@@ -203,4 +203,88 @@ export interface StaffRegistrationRequest {
   verificationNotes?: string;
   verifiedBy?: string;
 }
+
+export interface StudentEnrolled {
+  _id: string;
+  fullName: string;
+  phoneNumber: string;
+  hostel?: string;
+  roomNumber?: string;
+  bedLabel?: string;
+  batch?: string;
+  email?: string;
+}
+
+export interface StudentRecordMarks {
+  studentId?: string;
+  studentName: string;
+  rollNumber: string;
+  marksObtained: number;
+  grade?: string;
+  remarks?: string;
+}
+
+export interface Marksheet {
+  _id: string;
+  subject: string;
+  subjectCode?: string;
+  examType: string;
+  batch: string;
+  semester: string;
+  maxMarks: number;
+  passingMarks: number;
+  records: StudentRecordMarks[];
+  uploadedBy?: {
+    _id?: string;
+    fullName: string;
+    role?: string;
+    designation?: string;
+    department?: string;
+    email?: string;
+  };
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface StudyNote {
+  _id: string;
+  title: string;
+  subject: string;
+  description: string;
+  batch: string;
+  semester: string;
+  category: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: string;
+  fileType: string;
+  downloadsCount: number;
+  uploadedBy?: {
+    _id?: string;
+    fullName: string;
+    role?: string;
+    designation?: string;
+    department?: string;
+    email?: string;
+  };
+  createdAt: string;
+}
+
+export interface FacultyNoticeItem {
+  _id: string;
+  title: string;
+  body: string;
+  isEmergency: boolean;
+  targetAudience?: {
+    hostel?: string;
+    batch?: string;
+  };
+  createdBy?: {
+    _id?: string;
+    fullName: string;
+    role?: string;
+  };
+  createdAt: string;
+}
+
 

@@ -112,6 +112,8 @@ const getNoticesForUser = async (user) => {
     case 'TECHNICIAN':
     case 'SECURITY':
     case 'ADMIN':
+    case 'FACULTY':
+    case 'HOD':
       // These roles see all notices (no filtering)
       break;
     default:
@@ -128,9 +130,27 @@ const getNoticesForUser = async (user) => {
   return notices;
 };
 
+/**
+ * Delete notice by ID (allowed by creator or ADMIN)
+ */
+const deleteNotice = async (noticeId, userId, userRole) => {
+  const notice = await Notice.findById(noticeId);
+  if (!notice) {
+    throw new Error('Notice not found');
+  }
+
+  if (userRole !== 'ADMIN' && notice.createdBy.toString() !== userId.toString()) {
+    throw new Error('Unauthorized to delete this notice');
+  }
+
+  await Notice.findByIdAndDelete(noticeId);
+  return { success: true };
+};
+
 module.exports = {
   createNotice,
-  getNoticesForUser
+  getNoticesForUser,
+  deleteNotice
 };
 
 // Helper function for Socket.io emission to user

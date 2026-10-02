@@ -11,6 +11,7 @@ export interface TranslationDict {
     mess: string;
     kiosk: string;
     admin: string;
+    faculty: string;
   };
   actions: {
     approve: string;
@@ -85,6 +86,7 @@ export const translations: Record<Language, TranslationDict> = {
       mess: 'Mess & Cafeteria',
       kiosk: 'Lobby Kiosk',
       admin: 'System Administration',
+      faculty: 'Faculty & Academics',
     },
     actions: {
       approve: 'Approve',
@@ -157,6 +159,7 @@ export const translations: Record<Language, TranslationDict> = {
       mess: 'मेस और कैफेटेरिया',
       kiosk: 'लॉबी कियोस्क',
       admin: 'प्रणाली प्रशासन',
+      faculty: 'संकाय एवं अकादमिक',
     },
     actions: {
       approve: 'स्वीकृत करें',
@@ -229,6 +232,7 @@ export const translations: Record<Language, TranslationDict> = {
       mess: 'మెస్ & కేఫెటీరియా',
       kiosk: 'లాబీ కియోస్క్',
       admin: 'సిస్టమ్ నిర్వహణ',
+      faculty: 'ఫ్యాకల్టీ & అకాడెమిక్స్',
     },
     actions: {
       approve: 'ఆమోదించు',
@@ -301,6 +305,7 @@ export const translations: Record<Language, TranslationDict> = {
       mess: 'உணவுக்கூடம்',
       kiosk: 'கியோஸ்க் திரை',
       admin: 'முதன்மை நிர்வாகம்',
+      faculty: 'பேராசிரியர் & கல்வித் தளம்',
     },
     actions: {
       approve: 'ஒப்புதல் அளி',
@@ -373,6 +378,7 @@ export const translations: Record<Language, TranslationDict> = {
       mess: 'मेस आणि कॅन्टीन',
       kiosk: 'लॉबी किओस्क',
       admin: 'प्रणाली प्रशासन',
+      faculty: 'प्राध्यापक व शैक्षणिक',
     },
     actions: {
       approve: 'मंजूर करा',

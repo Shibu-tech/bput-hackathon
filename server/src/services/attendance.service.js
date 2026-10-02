@@ -1,49 +1,79 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const GatePass = require('../models/GatePass');
-const asyncHandler = require('../utils/asyncHandler');
 
 /**
- * Get attendance records for a warden (with optional date filter)
+ * Get attendance records for a warden, faculty, or admin (with optional date & subject filter)
  */
-const getAttendanceRecords = async (wardenId, dateFilter) => {
-  // Verify the user is a warden
-  const warden = await User.findById(wardenId);
-  if (!warden || warden.role !== 'WARDEN') {
-    throw new Error('Unauthorized: Warden access required');
+const getAttendanceRecords = async (userId, dateFilter, subjectFilter) => {
+  const user = await User.findById(userId);
+  if (!user || !['WARDEN', 'FACULTY', 'ADMIN'].includes(user.role)) {
+    throw new Error('Unauthorized: Warden, Faculty, or Admin access required');
   }
 
   let query = {};
 
-  // Add date filter if provided
   if (dateFilter) {
     query.attDate = dateFilter;
   }
 
+  if (subjectFilter && subjectFilter !== 'ALL') {
+    query.subject = subjectFilter;
+  }
+
   const attendanceRecords = await Attendance.find(query)
-    .populate('studentId', 'fullName role phoneNumber hostel batch')
-    .populate('markedBy', 'fullName role')
+    .populate('studentId', 'fullName role phoneNumber hostel batch roomNumber email')
+    .populate('markedBy', 'fullName role designation')
     .sort({ attDate: -1, createdAt: -1 });
 
   return attendanceRecords;
 };
 
 /**
- * Mark attendance for multiple students
- * Pre-fills roll call: students with gate pass in EXITED status default to ON_LEAVE
- * Everyone else defaults to PRESENT. Warden submits exceptions.
+ * Get all students for roll call roster
  */
-const markAttendance = async (attendanceRecords, wardenId) => {
-  // Verify the user is a warden
-  const warden = await User.findById(wardenId);
-  if (!warden || warden.role !== 'WARDEN') {
-    throw new Error('Unauthorized: Warden access required');
+const getStudents = async (query = {}) => {
+  const filter = { role: 'STUDENT' };
+
+  if (query.batch && query.batch !== 'ALL') {
+    filter.batch = query.batch;
+  }
+
+  if (query.hostel && query.hostel !== 'ALL') {
+    filter.hostel = query.hostel;
+  }
+
+  if (query.search) {
+    filter.$or = [
+      { fullName: { $regex: query.search, $options: 'i' } },
+      { phoneNumber: { $regex: query.search, $options: 'i' } },
+      { roomNumber: { $regex: query.search, $options: 'i' } },
+    ];
+  }
+
+  const students = await User.find(filter)
+    .select('_id fullName phoneNumber hostel roomNumber bedLabel batch email createdAt')
+    .sort({ fullName: 1 });
+
+  return students;
+};
+
+/**
+ * Mark attendance for multiple students
+ * Supports both Warden roll call & Faculty lecture attendance
+ */
+const markAttendance = async (attendanceRecords, markerId, customDate, subject = 'General') => {
+  const marker = await User.findById(markerId);
+  if (!marker || !['WARDEN', 'FACULTY', 'ADMIN'].includes(marker.role)) {
+    throw new Error('Unauthorized: Warden, Faculty, or Admin access required');
   }
 
   const results = [];
+  const targetDate = customDate || new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const targetSubject = subject || 'General';
 
   for (const record of attendanceRecords) {
-    const { studentId, status } = record;
+    const { studentId, status, remarks } = record;
 
     // Validate student exists
     const student = await User.findById(studentId);
@@ -67,53 +97,29 @@ const markAttendance = async (attendanceRecords, wardenId) => {
       continue;
     }
 
-    // Check if student has an EXITED gate pass for today
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const exitedPass = await GatePass.findOne({
-      studentId,
-      status: 'EXITED',
-      requestedExitTime: {
-        $gte: new Date(`${today}T00:00:00.000Z`),
-        $lt: new Date(`${today}T23:59:59.999Z`)
-      }
-    });
-
-    // Determine final status: use warden's submission, but we can validate against gate pass for logging if needed
-    let finalStatus;
-    // If student has EXITED gate pass, the default status is ON_LEAVE; otherwise PRESENT
-    const defaultStatus = exitedPass ? 'ON_LEAVE' : 'PRESENT';
-    // If warden's status differs from default, it's considered an exception (but we still use warden's status)
-    if (exitedPass && status !== 'ON_LEAVE') {
-      // Warden is submitting an exception to the pre-filled value
-      // We'll still use what the warden provided
-    } else if (!exitedPass && status === 'ON_LEAVE') {
-      // Student doesn't have EXITED gate pass but warden marked them ON_LEAVE
-      // This is also an exception to the default (PRESENT)
-      // We'll still use what the warden provided
-    }
-    // Use the warden's submitted status
-    finalStatus = status;
-
     // Upsert attendance record
     const attendanceRecord = await Attendance.findOneAndUpdate(
       {
         studentId,
-        attDate: today
+        attDate: targetDate,
+        subject: targetSubject
       },
       {
         studentId,
-        attDate: today,
-        status: finalStatus,
-        markedBy: wardenId
+        attDate: targetDate,
+        subject: targetSubject,
+        status,
+        markedBy: markerId
       },
       {
         upsert: true,
-        new: true
+        new: true,
+        setDefaultsOnInsert: true
       }
     );
 
     results.push({
-      studentId: attendanceRecord.studentId._id,
+      studentId: attendanceRecord.studentId,
       success: true,
       data: attendanceRecord
     });
@@ -124,5 +130,6 @@ const markAttendance = async (attendanceRecords, wardenId) => {
 
 module.exports = {
   getAttendanceRecords,
+  getStudents,
   markAttendance
 };

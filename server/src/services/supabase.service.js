@@ -181,10 +181,77 @@ const deleteFileFromSupabase = async (filePath) => {
   }
 };
 
+/**
+ * Automatically find any legacy GridFS files in offerLetters.files that are not yet migrated to Supabase
+ * and upload them, updating the corresponding User records.
+ */
+const syncGridFsToSupabase = async () => {
+  const mongoose = require('mongoose');
+  if (!mongoose.connection || !mongoose.connection.db) return;
+
+  try {
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    const hasGridFS = collections.some((c) => c.name === 'offerLetters.files');
+    if (!hasGridFS) return;
+
+    const User = require('../models/User');
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'offerLetters' });
+    const files = await mongoose.connection.db.collection('offerLetters.files').find({}).toArray();
+
+    for (const f of files) {
+      // Check if any user still has /api/files/:id or missing public offerLetter
+      const pendingUsers = await User.find({
+        $or: [
+          { offerLetter: `/api/files/${f._id.toString()}` },
+          { offerLetterFileId: f._id, offerLetter: { $not: /^https?:\/\// } },
+          { offerLetterFileId: f._id.toString(), offerLetter: { $not: /^https?:\/\// } },
+        ],
+      });
+
+      if (pendingUsers.length > 0) {
+        try {
+          const downloadStream = bucket.openDownloadStream(f._id);
+          const chunks = [];
+          for await (const chunk of downloadStream) {
+            chunks.push(chunk);
+          }
+          const buffer = Buffer.concat(chunks);
+          const contentType = f.contentType || f.metadata?.contentType || 'application/pdf';
+
+          const uploaded = await uploadBufferToSupabase(f.filename || 'Offer_Letter.pdf', buffer, contentType);
+          await User.updateMany(
+            {
+              $or: [
+                { offerLetterFileId: f._id },
+                { offerLetterFileId: f._id.toString() },
+                { offerLetter: `/api/files/${f._id.toString()}` },
+              ],
+            },
+            {
+              $set: {
+                offerLetter: uploaded.publicUrl,
+                offerLetterPath: uploaded.path,
+                offerLetterContentType: contentType,
+                offerLetterSize: buffer.length,
+              },
+            }
+          );
+          console.log(`[SupabaseSync] Synchronized ${f.filename} (${f._id}) to Supabase: ${uploaded.publicUrl}`);
+        } catch (fileErr) {
+          console.warn(`[SupabaseSync] Notice while syncing ${f.filename}:`, fileErr.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[SupabaseSync] GridFS sync notice:', err.message);
+  }
+};
+
 module.exports = {
   getSupabaseConfig,
   getSupabaseClient,
   uploadBufferToSupabase,
   uploadBase64ToSupabase,
   deleteFileFromSupabase,
+  syncGridFsToSupabase,
 };

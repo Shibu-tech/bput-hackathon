@@ -7,6 +7,8 @@ const attendanceRoutes = require('./attendance.routes');
 const pushRoutes = require('./push.routes');
 const locationRoutes = require('./location.routes');
 const fileRoutes = require('./file.routes');
+const marksRoutes = require('./marks.routes');
+const noteRoutes = require('./note.routes');
 
 module.exports = {
   authRoutes,
@@ -18,4 +20,6 @@ module.exports = {
   pushRoutes,
   locationRoutes,
   fileRoutes,
+  marksRoutes,
+  noteRoutes,
 };

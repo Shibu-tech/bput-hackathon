@@ -1,15 +1,13 @@
 const noticeService = require('../services/notice.service');
-const pushService = require('../services/push.service');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 
 /**
  * @desc    Create a new notice
  * @route   POST /api/notices
- * @access  Private (WARDEN, ADMIN)
+ * @access  Private (WARDEN, ADMIN, FACULTY)
  */
 const createNotice = asyncHandler(async (req, res) => {
-  // Add createdBy from authenticated user
   const noticeData = {
     ...req.body,
     createdBy: req.user._id
@@ -37,7 +35,24 @@ const getNotices = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Delete a notice
+ * @route   DELETE /api/notices/:id
+ * @access  Private (Creator, ADMIN)
+ */
+const deleteNotice = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  await noticeService.deleteNotice(id, req.user._id, req.user.role);
+
+  res.json({
+    success: true,
+    message: 'Notice deleted successfully'
+  });
+});
+
 module.exports = {
   createNotice,
-  getNotices
+  getNotices,
+  deleteNotice
 };

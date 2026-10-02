@@ -23,6 +23,11 @@ export const mapBackendRoleToFrontend = (backendRole?: string | null): UserRole 
       return 'kiosk';
     case 'ADMIN':
       return 'admin';
+    case 'FACULTY':
+    case 'HOD':
+    case 'EXAM_CELL':
+    case 'ACCOUNTS':
+      return 'faculty';
     default:
       return 'student';
   }
@@ -34,6 +39,14 @@ interface AuthContextType {
     fullName: string;
     role: UserRole;
     phoneNumber: string;
+    email?: string;
+    designation?: string;
+    employeeId?: string;
+    department?: string;
+    cabin?: string;
+    officeHours?: string;
+    bio?: string;
+    status?: string;
     hostel?: string;
     roomNumber?: string;
     bedLabel?: string;
@@ -48,6 +61,15 @@ interface AuthContextType {
   setActiveRole: (role: UserRole) => void;
 
   updateUserRoom: (roomData: { hostel: string; roomNumber: string; bedLabel: string }) => Promise<void>;
+  updateUserProfile: (profileData: Partial<{
+    fullName: string;
+    email: string;
+    designation: string;
+    department: string;
+    cabin: string;
+    officeHours: string;
+    bio: string;
+  }>) => Promise<void>;
 
   login: (phoneNumber: string, password: string, overrideRole?: UserRole) => Promise<void>;
 
@@ -120,8 +142,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setBackendRole(backendRoleFromData);
         const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
         const storedRole = localStorage.getItem('active_role') as UserRole | null;
-        const validRoles: UserRole[] = ['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin'];
-        const resolvedRole = (storedRole && validRoles.includes(storedRole)) ? storedRole : frontendRole;
+        const validRoles: UserRole[] = ['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin', 'faculty'];
+
+        // If user's actual registered role is faculty or warden, ensure they aren't stuck on student from an old session
+        let resolvedRole: UserRole = frontendRole;
+        if (storedRole && validRoles.includes(storedRole)) {
+          if (frontendRole === 'faculty' && storedRole === 'student') {
+            resolvedRole = 'faculty';
+          } else {
+            resolvedRole = storedRole;
+          }
+        }
 
         const storedRoom = localStorage.getItem('student_assigned_room');
         let parsedRoom: { hostel?: string; roomNumber?: string; bedLabel?: string } | null = null;
@@ -140,12 +171,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           fullName: rawUser.fullName,
           role: resolvedRole,
           phoneNumber: rawUser.phoneNumber,
+          email: rawUser.email || '',
+          designation: rawUser.designation || (frontendRole === 'faculty' ? 'Assistant Professor / Faculty' : ''),
+          employeeId: rawUser.employeeId || '',
+          department: rawUser.department || (frontendRole === 'faculty' ? 'Computer Science & Engineering' : ''),
+          cabin: rawUser.cabin || (frontendRole === 'faculty' ? 'Academic Block B, Room 304' : ''),
+          officeHours: rawUser.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+          bio: rawUser.bio || '',
+          status: rawUser.status || 'ACTIVE',
           hostel: userHostel,
           roomNumber: userRoom,
           bedLabel: userBed,
           batch: rawUser.batch,
         });
         setActiveRoleState(resolvedRole);
+        localStorage.setItem('active_role', resolvedRole);
       } catch (err) {
         console.error('Auth error:', err);
         localStorage.removeItem('token');
@@ -200,7 +240,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const backendRoleFromData = rawUser.role;
     setBackendRole(backendRoleFromData);
     const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
-    const resolvedRole = overrideRole || frontendRole;
+
+    // If the registered backend role is FACULTY, automatically direct to faculty dashboard rather than defaulting to student
+    let resolvedRole = frontendRole;
+    if (overrideRole && overrideRole !== 'student') {
+      resolvedRole = overrideRole;
+    } else if (frontendRole === 'faculty') {
+      resolvedRole = 'faculty';
+    }
 
     localStorage.setItem('active_role', resolvedRole);
 
@@ -221,6 +268,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       fullName: rawUser.fullName,
       role: resolvedRole,
       phoneNumber: rawUser.phoneNumber,
+      email: rawUser.email || '',
+      designation: rawUser.designation || (frontendRole === 'faculty' ? 'Assistant Professor / Faculty' : ''),
+      employeeId: rawUser.employeeId || '',
+      department: rawUser.department || (frontendRole === 'faculty' ? 'Computer Science & Engineering' : ''),
+      cabin: rawUser.cabin || (frontendRole === 'faculty' ? 'Academic Block B, Room 304' : ''),
+      officeHours: rawUser.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+      bio: rawUser.bio || '',
+      status: rawUser.status || 'ACTIVE',
       hostel: userHostel,
       roomNumber: userRoom,
       bedLabel: userBed,
@@ -257,6 +312,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       } catch (err) {
         console.warn('Could not sync room update to server:', err);
+      }
+    }
+  };
+
+  // Update Profile (Faculty / Staff / Student)
+  const updateUserProfile = async (profileData: Partial<{
+    fullName: string;
+    email: string;
+    designation: string;
+    department: string;
+    cabin: string;
+    officeHours: string;
+    bio: string;
+  }>) => {
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            ...profileData,
+          }
+        : null
+    );
+
+    const currentToken = token || localStorage.getItem('token');
+    if (currentToken) {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update profile');
+      }
+
+      const data = await res.json();
+      const updatedUser = data.data?.user || data.user;
+      if (updatedUser) {
+        setUser((prev) => (prev ? { ...prev, ...updatedUser } : null));
       }
     }
   };
@@ -317,6 +415,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         fullName: rawUser.fullName,
         role: frontendRole,
         phoneNumber: rawUser.phoneNumber,
+        email: rawUser.email || userData.email || '',
+        designation: rawUser.designation || userData.designation || '',
+        employeeId: rawUser.employeeId || userData.employeeId || '',
+        department: rawUser.department || 'Computer Science & Engineering',
+        cabin: rawUser.cabin || 'Academic Block B, Room 304',
+        officeHours: rawUser.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+        bio: rawUser.bio || '',
+        status: rawUser.status || 'ACTIVE',
         hostel: rawUser.hostel || userData.hostel,
         roomNumber: rawUser.roomNumber,
         bedLabel: rawUser.bedLabel || 'A',
@@ -324,6 +430,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     }
     setActiveRoleState(frontendRole);
+    localStorage.setItem('active_role', frontendRole);
   };
 
   const setActiveRole = (newRole: UserRole) => {
@@ -355,6 +462,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         activeRole,
         setActiveRole,
         updateUserRoom,
+        updateUserProfile,
         login,
         register,
         logout,

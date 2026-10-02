@@ -893,22 +893,45 @@ const Register: React.FC = () => {
           {/* =========================================================
               SLIDE 5: CONFIRMATION / VERIFICATION PENDING
           ========================================================= */}
+          {/* =========================================================
+              SLIDE 5: CONFIRMATION / VERIFICATION OR ACTIVE
+          ========================================================= */}
           {currentSlide === 5 && (
             <div className="py-8 text-center space-y-5">
-              <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm animate-bounce">
-                <Clock className="w-8 h-8" />
-              </div>
+              {selectedRole?.roleKey === 'FACULTY' || selectedRole?.roleKey === 'HOD' ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 mx-auto shadow-sm animate-pulse">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
 
-              <div className="space-y-2 max-w-md mx-auto">
-                <span className="inline-block px-3 py-1 bg-amber-100/70 border border-amber-300 text-amber-800 text-xs font-bold rounded-full">
-                  Status: Pending Super Admin Verification
-                </span>
-                <h2 className="text-xl font-extrabold text-slate-900">Application Transmitted Successfully!</h2>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Your staff registration with Employee ID <strong className="text-indigo-600">{employeeId}</strong> and
-                  attached offer letter have been submitted to the Super Admin for security verification.
-                </p>
-              </div>
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <span className="inline-block px-3.5 py-1 bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-full">
+                      ✓ Status: Account Active & Verified
+                    </span>
+                    <h2 className="text-xl font-extrabold text-slate-900">Welcome to Faculty Portal!</h2>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Your faculty account (<strong className="text-indigo-600">{employeeId}</strong>) has been verified. You can now manage student attendance, upload marks, share study notes, and publish circulars.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm animate-bounce">
+                    <Clock className="w-8 h-8" />
+                  </div>
+
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <span className="inline-block px-3 py-1 bg-amber-100/70 border border-amber-300 text-amber-800 text-xs font-bold rounded-full">
+                      Status: Pending Super Admin Verification
+                    </span>
+                    <h2 className="text-xl font-extrabold text-slate-900">Application Transmitted Successfully!</h2>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Your staff registration with Employee ID <strong className="text-indigo-600">{employeeId}</strong> and
+                      attached offer letter have been submitted to the Super Admin for security verification.
+                    </p>
+                  </div>
+                </>
+              )}
 
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl max-w-sm mx-auto text-xs text-left space-y-1.5">
                 <div className="flex justify-between">
@@ -929,15 +952,26 @@ const Register: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md cursor-pointer transition-all"
-                >
-                  <span>Return to Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                {selectedRole?.roleKey === 'FACULTY' || selectedRole?.roleKey === 'HOD' ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md cursor-pointer transition-all"
+                  >
+                    <span>Enter Faculty Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md cursor-pointer transition-all"
+                  >
+                    <span>Return to Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           )}
