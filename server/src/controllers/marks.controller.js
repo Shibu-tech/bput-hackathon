@@ -81,9 +81,27 @@ const getMarksheets = asyncHandler(async (req, res) => {
   if (batch && batch !== 'ALL') filter.batch = batch;
   if (examType && examType !== 'ALL') filter.examType = examType;
 
-  // If user is a student, only show marksheets for their batch
-  if (req.user.role === 'STUDENT' && req.user.batch) {
-    filter.batch = req.user.batch;
+  // If user is a student, ensure they receive marksheets relevant to their batch or enrolled records
+  if (req.user.role === 'STUDENT') {
+    const studentRoll = req.user.phoneNumber ? `STU-${req.user.phoneNumber.slice(-4)}` : '';
+    const studentOrConditions = [
+      { batch: 'ALL' },
+      { 'records.studentId': req.user._id },
+    ];
+    if (studentRoll) {
+      studentOrConditions.push({ 'records.rollNumber': studentRoll });
+      studentOrConditions.push({ 'records.rollNumber': { $regex: new RegExp(`^${studentRoll}$`, 'i') } });
+    }
+    if (req.user.fullName) {
+      studentOrConditions.push({ 'records.studentName': { $regex: new RegExp(req.user.fullName, 'i') } });
+    }
+    if (req.user.batch) {
+      studentOrConditions.push({ batch: req.user.batch });
+    } else {
+      // If student account does not have a specific batch configured, allow access to class marksheets
+      studentOrConditions.push({ 'records.0': { $exists: true } });
+    }
+    filter.$or = studentOrConditions;
   }
 
   const marksheets = await Marks.find(filter)

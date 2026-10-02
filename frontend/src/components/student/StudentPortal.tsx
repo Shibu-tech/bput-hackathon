@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { useAuth } from '../../context/AuthContext';
 import { translations } from '../../utils/translations';
@@ -91,29 +91,30 @@ export const StudentPortal: React.FC = () => {
   const [academicNotes, setAcademicNotes] = useState<any[]>([]);
   const [academicMarks, setAcademicMarks] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchAcademics = async () => {
-      const token = localStorage.getItem('token');
-      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-      try {
-        const [nRes, mRes] = await Promise.all([
-          fetch('/api/notes', { headers }),
-          fetch('/api/marks', { headers }),
-        ]);
-        if (nRes.ok) {
-          const nData = await nRes.json();
-          setAcademicNotes(nData.data || []);
-        }
-        if (mRes.ok) {
-          const mData = await mRes.json();
-          setAcademicMarks(mData.data || []);
-        }
-      } catch (e) {
-        console.warn('Academics fetch err:', e);
+  const fetchAcademics = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const [nRes, mRes] = await Promise.all([
+        fetch('/api/notes', { headers }),
+        fetch('/api/marks', { headers }),
+      ]);
+      if (nRes.ok) {
+        const nData = await nRes.json();
+        setAcademicNotes(nData.data || []);
       }
-    };
-    fetchAcademics();
+      if (mRes.ok) {
+        const mData = await mRes.json();
+        setAcademicMarks(mData.data || []);
+      }
+    } catch (e) {
+      console.warn('Academics fetch err:', e);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAcademics();
+  }, [fetchAcademics]);
 
   const { user } = useAuth();
   const studentDisplayName = user?.fullName || 'Student';
@@ -1446,56 +1447,10 @@ export const StudentPortal: React.FC = () => {
               <StudentMarksheetView
                 studentName={studentDisplayName}
                 studentRoll={studentRoll}
+                userId={user?._id || user?.id}
+                initialMarks={academicMarks}
+                onRefresh={fetchAcademics}
               />
-
-              {academicMarks.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Award className="w-4 h-4 text-purple-600" />
-                      <h3 className="text-sm font-bold text-slate-900">Faculty Published Examination Marksheets</h3>
-                    </div>
-                    <span className="text-xs text-slate-400 font-semibold">{academicMarks.length} Marksheets</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {academicMarks.map((m) => {
-                      const myRecord = m.records?.find((r: any) =>
-                        r.studentName?.toLowerCase() === studentDisplayName.toLowerCase() ||
-                        r.rollNumber === studentRoll
-                      );
-
-                      return (
-                        <div key={m._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-2xs font-extrabold uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-                              {m.examType}
-                            </span>
-                            <span className="text-3xs text-slate-400 font-medium">Batch {m.batch}</span>
-                          </div>
-                          <h4 className="text-xs font-bold text-slate-900">{m.subject}</h4>
-                          <p className="text-2xs text-slate-500">{m.semester} · Max Marks: {m.maxMarks}</p>
-
-                          {myRecord ? (
-                            <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                              <span className="text-2xs font-bold text-slate-700">
-                                Score: <span className="text-indigo-600 text-xs">{myRecord.marksObtained}</span> / {m.maxMarks}
-                              </span>
-                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-2xs">
-                                Grade: {myRecord.grade || 'A'}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="pt-2 border-t border-slate-200/80 text-3xs text-slate-400 italic">
-                              Class marksheet available (Passing marks: {m.passingMarks})
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

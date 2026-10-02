@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   GraduationCap,
   Award,
@@ -14,40 +14,406 @@ import {
   ShieldCheck,
   QrCode,
   FileText,
+  RefreshCw,
+  Clock,
+  AlertCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { SemesterMarksheet, SubjectMark } from '../../types';
-import { initialSemesterMarksheets } from '../../data/academicData';
+
+interface FacultyMarksheetRecord {
+  studentId?: string;
+  studentName: string;
+  rollNumber: string;
+  marksObtained: number;
+  grade?: string;
+  remarks?: string;
+}
+
+interface FacultyMarksheet {
+  _id: string;
+  subject: string;
+  subjectCode?: string;
+  examType: string;
+  batch: string;
+  semester: string;
+  maxMarks: number;
+  passingMarks: number;
+  records: FacultyMarksheetRecord[];
+  uploadedBy?: {
+    _id?: string;
+    fullName?: string;
+    designation?: string;
+    department?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 interface StudentMarksheetViewProps {
   studentName: string;
   studentRoll: string;
   branch?: string;
+  userId?: string;
+  initialMarks?: FacultyMarksheet[];
+  onRefresh?: () => void;
 }
+
+interface BaseTerm {
+  semesterId: string;
+  semesterName: string;
+  academicYear: string;
+  semNumber: number;
+}
+
+const DEFAULT_TERMS: BaseTerm[] = [
+  { semesterId: 'sem-5', semesterName: 'Semester 5 (Current Autumn 2024)', academicYear: '2024-2025', semNumber: 5 },
+  { semesterId: 'sem-4', semesterName: 'Semester 4 (Spring 2024)', academicYear: '2023-2024', semNumber: 4 },
+  { semesterId: 'sem-3', semesterName: 'Semester 3 (Autumn 2023)', academicYear: '2023-2024', semNumber: 3 },
+  { semesterId: 'sem-2', semesterName: 'Semester 2 (Spring 2023)', academicYear: '2022-2023', semNumber: 2 },
+  { semesterId: 'sem-1', semesterName: 'Semester 1 (Autumn 2022)', academicYear: '2022-2023', semNumber: 1 },
+];
+
+const normalizeSemesterId = (semStr: string): string => {
+  if (!semStr) return 'sem-5';
+  const clean = semStr.toLowerCase();
+  if (clean.includes('5') || clean.includes('v')) return 'sem-5';
+  if (clean.includes('4') || clean.includes('iv')) return 'sem-4';
+  if (clean.includes('3') || clean.includes('iii')) return 'sem-3';
+  if (clean.includes('2') || clean.includes('ii')) return 'sem-2';
+  if (clean.includes('1') || clean.includes('i')) return 'sem-1';
+  if (clean.includes('6') || clean.includes('vi')) return 'sem-6';
+  if (clean.includes('7') || clean.includes('vii')) return 'sem-7';
+  if (clean.includes('8') || clean.includes('viii')) return 'sem-8';
+  return 'sem-5';
+};
+
+const matchStudentRecord = (
+  records: FacultyMarksheetRecord[] = [],
+  studentName: string,
+  studentRoll: string,
+  userId?: string
+): FacultyMarksheetRecord | undefined => {
+  const normName = (studentName || '').trim().toLowerCase();
+  const normRoll = (studentRoll || '').trim().toLowerCase();
+  const digitsRoll = normRoll.replace(/[^0-9]/g, '');
+
+  return records.find((r) => {
+    if (userId && r.studentId && String(r.studentId) === String(userId)) return true;
+    if (r.rollNumber) {
+      const rRoll = r.rollNumber.trim().toLowerCase();
+      if (rRoll === normRoll) return true;
+      const rDigits = rRoll.replace(/[^0-9]/g, '');
+      if (digitsRoll && rDigits && digitsRoll === rDigits) return true;
+    }
+    if (r.studentName) {
+      const rName = r.studentName.trim().toLowerCase();
+      if (rName === normName) return true;
+      if (normName && (rName.includes(normName) || normName.includes(rName))) return true;
+    }
+    return false;
+  });
+};
+
+const buildSemesterMarksheets = (
+  facultyMarks: FacultyMarksheet[],
+  studentName: string,
+  studentRoll: string,
+  userId?: string
+): SemesterMarksheet[] => {
+  const termMap = new Map<string, BaseTerm>();
+  DEFAULT_TERMS.forEach((t) => termMap.set(t.semesterId, t));
+
+  // Auto-discover any new semesters uploaded by faculty
+  facultyMarks.forEach((m) => {
+    const semId = normalizeSemesterId(m.semester);
+    if (!termMap.has(semId)) {
+      termMap.set(semId, {
+        semesterId: semId,
+        semesterName: m.semester || `Semester ${semId.replace('sem-', '')}`,
+        academicYear: '2024-2025',
+        semNumber: parseInt(semId.replace('sem-', ''), 10) || 5,
+      });
+    }
+  });
+
+  const allTerms = Array.from(termMap.values()).sort((a, b) => b.semNumber - a.semNumber);
+
+  return allTerms.map((term) => {
+    // Collect all faculty marksheets belonging to this semester
+    const termMarksheets = facultyMarks.filter(
+      (m) => normalizeSemesterId(m.semester) === term.semesterId
+    );
+
+    // Group marksheets by subject
+    const subjectGroups = new Map<string, FacultyMarksheet[]>();
+    termMarksheets.forEach((m) => {
+      const key = (m.subjectCode?.trim() || m.subject.trim()).toUpperCase();
+      if (!subjectGroups.has(key)) {
+        subjectGroups.set(key, []);
+      }
+      subjectGroups.get(key)!.push(m);
+    });
+
+    const subjects: SubjectMark[] = [];
+
+    subjectGroups.forEach((msList, subjectKey) => {
+      let facultyName = 'Faculty Member';
+      let subjectCode = subjectKey;
+      let subjectName = msList[0]?.subject || subjectKey;
+      let latestPublishedStr = '';
+
+      msList.forEach((m) => {
+        if (m.uploadedBy?.fullName) facultyName = m.uploadedBy.fullName;
+        if (m.subjectCode) subjectCode = m.subjectCode;
+        if (m.subject) subjectName = m.subject;
+        if (m.createdAt) {
+          latestPublishedStr = new Date(m.createdAt).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          });
+        }
+      });
+
+      // Find specific exam types if separate
+      const quizMs = msList.find((m) => m.examType === 'Assignment / Quiz');
+      const surpriseMs = msList.find((m) => m.examType.toLowerCase().includes('surprise'));
+      const internalMs = msList.find(
+        (m) =>
+          m.examType === 'Internal Assessment 1' ||
+          m.examType === 'Internal Assessment 2' ||
+          m.examType === 'Mid Term'
+      );
+      const endSemMs = msList.find(
+        (m) => m.examType === 'End Term' || m.examType === 'Practical / Lab Exam'
+      );
+
+      let quizScore = 0;
+      let surpriseTestScore = 0;
+      let internalScore = 0;
+      let semesterScore = 0;
+      let totalScore = 0;
+      let hasMatchedRecord = false;
+
+      if (quizMs || surpriseMs || internalMs || endSemMs) {
+        if (quizMs) {
+          const r = matchStudentRecord(quizMs.records, studentName, studentRoll, userId);
+          if (r) {
+            quizScore = Number(((r.marksObtained / (quizMs.maxMarks || 10)) * 10).toFixed(1));
+            hasMatchedRecord = true;
+          }
+        }
+        if (surpriseMs) {
+          const r = matchStudentRecord(surpriseMs.records, studentName, studentRoll, userId);
+          if (r) {
+            surpriseTestScore = Number(((r.marksObtained / (surpriseMs.maxMarks || 10)) * 10).toFixed(1));
+            hasMatchedRecord = true;
+          }
+        }
+        if (internalMs) {
+          const r = matchStudentRecord(internalMs.records, studentName, studentRoll, userId);
+          if (r) {
+            internalScore = Number(((r.marksObtained / (internalMs.maxMarks || 30)) * 30).toFixed(1));
+            hasMatchedRecord = true;
+          }
+        }
+        if (endSemMs) {
+          const r = matchStudentRecord(endSemMs.records, studentName, studentRoll, userId);
+          if (r) {
+            semesterScore = Number(((r.marksObtained / (endSemMs.maxMarks || 50)) * 50).toFixed(1));
+            hasMatchedRecord = true;
+          }
+        }
+        totalScore = Number((quizScore + surpriseTestScore + internalScore + semesterScore).toFixed(1));
+      } else {
+        // Consolidated single marksheet upload
+        const mainMs = msList[0];
+        const r = matchStudentRecord(mainMs.records, studentName, studentRoll, userId);
+        if (r) {
+          hasMatchedRecord = true;
+          const scaled100 = (r.marksObtained / (mainMs.maxMarks || 100)) * 100;
+          totalScore = Number(scaled100.toFixed(1));
+          quizScore = Number((totalScore * 0.1).toFixed(1));
+          surpriseTestScore = Number((totalScore * 0.1).toFixed(1));
+          internalScore = Number((totalScore * 0.3).toFixed(1));
+          semesterScore = Number((totalScore * 0.5).toFixed(1));
+        }
+      }
+
+      // If student is not present in this marksheet's roster at all, skip subject
+      if (!hasMatchedRecord) {
+        return;
+      }
+
+      // Clamp component scores
+      quizScore = Math.min(10, Math.max(0, quizScore));
+      surpriseTestScore = Math.min(10, Math.max(0, surpriseTestScore));
+      internalScore = Math.min(30, Math.max(0, internalScore));
+      semesterScore = Math.min(50, Math.max(0, semesterScore));
+      totalScore = Math.min(100, Math.max(0, totalScore));
+
+      let grade: 'O' | 'E' | 'A' | 'B' | 'C' | 'D' | 'F' = 'F';
+      let gradePoint = 0.0;
+      if (totalScore >= 90) { grade = 'O'; gradePoint = 10.0; }
+      else if (totalScore >= 80) { grade = 'E'; gradePoint = 9.0; }
+      else if (totalScore >= 70) { grade = 'A'; gradePoint = 8.0; }
+      else if (totalScore >= 60) { grade = 'B'; gradePoint = 7.0; }
+      else if (totalScore >= 50) { grade = 'C'; gradePoint = 6.0; }
+      else if (totalScore >= 40) { grade = 'D'; gradePoint = 5.0; }
+      else { grade = 'F'; gradePoint = 0.0; }
+
+      const status: 'PASS' | 'FAIL' = totalScore >= 40 ? 'PASS' : 'FAIL';
+
+      const isLab =
+        subjectName.toLowerCase().includes('lab') ||
+        subjectName.toLowerCase().includes('practical') ||
+        subjectCode.toLowerCase().includes('lab');
+      const isScience =
+        subjectName.toLowerCase().includes('math') ||
+        subjectName.toLowerCase().includes('physics') ||
+        subjectName.toLowerCase().includes('chem');
+      const credits = isLab ? 2 : 4;
+      const category: 'Core Theory' | 'Basic Sciences' | 'Laboratory / Practical' = isLab
+        ? 'Laboratory / Practical'
+        : isScience
+        ? 'Basic Sciences'
+        : 'Core Theory';
+
+      subjects.push({
+        subjectCode,
+        subjectName,
+        facultyName,
+        credits,
+        category,
+        quizScore,
+        quizMax: 10,
+        surpriseTestScore,
+        surpriseTestMax: 10,
+        internalScore,
+        internalMax: 30,
+        semesterScore,
+        semesterMax: 50,
+        totalScore,
+        totalMax: 100,
+        grade,
+        gradePoint,
+        status,
+      } as SubjectMark);
+    });
+
+    const totalCredits = subjects.reduce((sum, s) => sum + s.credits, 0);
+    const earnedCredits = subjects.filter((s) => s.status === 'PASS').reduce((sum, s) => sum + s.credits, 0);
+    const totalPoints = subjects.reduce((sum, s) => sum + s.credits * s.gradePoint, 0);
+    const sgpa = totalCredits > 0 ? Number((totalPoints / totalCredits).toFixed(2)) : 0;
+    const cgpa = sgpa;
+    const failCount = subjects.filter((s) => s.status === 'FAIL').length;
+    const resultStatus: 'PASS' | 'PROMOTED' | 'FAIL' =
+      subjects.length === 0 ? 'PASS' : failCount === 0 ? 'PASS' : failCount <= 2 ? 'PROMOTED' : 'FAIL';
+
+    return {
+      semesterId: term.semesterId,
+      semesterName: term.semesterName,
+      academicYear: term.academicYear,
+      totalCredits,
+      earnedCredits,
+      sgpa,
+      cgpa,
+      resultStatus,
+      publishedDate: subjects.length > 0 ? 'Gazetted' : 'Awaiting Publication',
+      subjects,
+    };
+  });
+};
 
 export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
   studentName,
   studentRoll,
   branch = 'B.Tech - Computer Science & Engineering',
+  userId,
+  initialMarks,
+  onRefresh,
 }) => {
-  const [marksheets] = useState<SemesterMarksheet[]>(() => {
-    const saved = localStorage.getItem('bput_student_marksheets');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return initialSemesterMarksheets;
-      }
-    }
-    return initialSemesterMarksheets;
-  });
-
+  const [facultyMarks, setFacultyMarks] = useState<FacultyMarksheet[]>(initialMarks || []);
+  const [loading, setLoading] = useState(false);
+  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const [selectedSemId, setSelectedSemId] = useState<string>('sem-5');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showPrintModal, setShowPrintModal] = useState(false);
 
-  const activeMarksheet =
-    marksheets.find((m) => m.semesterId === selectedSemId) || marksheets[0];
+  // Fetch marks from faculty upload endpoint
+  const fetchMarks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/marks', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const marksheetsData: FacultyMarksheet[] = json.data || [];
+        setFacultyMarks(marksheetsData);
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.warn('Could not fetch faculty marks:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch on mount & setup real-time listener for faculty uploads
+  useEffect(() => {
+    fetchMarks();
+
+    const handleMarksUpdated = () => {
+      fetchMarks();
+      if (onRefresh) onRefresh();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'marks_last_updated') {
+        fetchMarks();
+        if (onRefresh) onRefresh();
+      }
+    };
+
+    window.addEventListener('marks_updated', handleMarksUpdated);
+    window.addEventListener('storage', handleStorage);
+
+    // Periodic auto-poll every 12 seconds so updates arrive automatically without user action
+    const interval = setInterval(() => {
+      fetchMarks();
+    }, 12000);
+
+    return () => {
+      window.removeEventListener('marks_updated', handleMarksUpdated);
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, [fetchMarks, onRefresh]);
+
+  // Transform faculty marks dynamically using the student credentials
+  const marksheets: SemesterMarksheet[] = React.useMemo(() => {
+    return buildSemesterMarksheets(facultyMarks, studentName, studentRoll, userId);
+  }, [facultyMarks, studentName, studentRoll, userId]);
+
+  const activeMarksheet: SemesterMarksheet =
+    marksheets.find((m) => m.semesterId === selectedSemId) || marksheets[0] || {
+      semesterId: 'sem-5',
+      semesterName: 'Semester 5 (Current Autumn 2024)',
+      academicYear: '2024-2025',
+      totalCredits: 0,
+      earnedCredits: 0,
+      sgpa: 0,
+      cgpa: 0,
+      resultStatus: 'PASS',
+      publishedDate: 'Awaiting Publication',
+      subjects: [],
+    };
+
+  const hasSubjects = activeMarksheet.subjects && activeMarksheet.subjects.length > 0;
 
   const filteredSubjects = activeMarksheet.subjects.filter((sub) => {
     const matchesSearch =
@@ -59,26 +425,22 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
     return matchesSearch && matchesCategory;
   });
 
-  // Calculate averages across components
-  const avgQuiz = (
-    activeMarksheet.subjects.reduce((sum, s) => sum + s.quizScore, 0) /
-    activeMarksheet.subjects.length
-  ).toFixed(1);
+  // Safe averages across components
+  const avgQuiz = hasSubjects
+    ? (activeMarksheet.subjects.reduce((sum, s) => sum + s.quizScore, 0) / activeMarksheet.subjects.length).toFixed(1)
+    : '--';
 
-  const avgSurprise = (
-    activeMarksheet.subjects.reduce((sum, s) => sum + s.surpriseTestScore, 0) /
-    activeMarksheet.subjects.length
-  ).toFixed(1);
+  const avgSurprise = hasSubjects
+    ? (activeMarksheet.subjects.reduce((sum, s) => sum + s.surpriseTestScore, 0) / activeMarksheet.subjects.length).toFixed(1)
+    : '--';
 
-  const avgInternals = (
-    activeMarksheet.subjects.reduce((sum, s) => sum + s.internalScore, 0) /
-    activeMarksheet.subjects.length
-  ).toFixed(1);
+  const avgInternals = hasSubjects
+    ? (activeMarksheet.subjects.reduce((sum, s) => sum + s.internalScore, 0) / activeMarksheet.subjects.length).toFixed(1)
+    : '--';
 
-  const avgSemester = (
-    activeMarksheet.subjects.reduce((sum, s) => sum + s.semesterScore, 0) /
-    activeMarksheet.subjects.length
-  ).toFixed(1);
+  const avgSemester = hasSubjects
+    ? (activeMarksheet.subjects.reduce((sum, s) => sum + s.semesterScore, 0) / activeMarksheet.subjects.length).toFixed(1)
+    : '--';
 
   const getGradeBadge = (grade: string) => {
     switch (grade) {
@@ -90,8 +452,12 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
         return 'bg-blue-50 text-blue-700 border-blue-200 font-bold';
       case 'B':
         return 'bg-amber-50 text-amber-700 border-amber-200 font-bold';
+      case 'C':
+        return 'bg-teal-50 text-teal-700 border-teal-200 font-bold';
+      case 'D':
+        return 'bg-slate-100 text-slate-700 border-slate-200 font-semibold';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-rose-50 text-rose-700 border-rose-200 font-bold';
     }
   };
 
@@ -116,20 +482,39 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
               <span className="text-2xs text-slate-400">
                 Academic Year {activeMarksheet.academicYear}
               </span>
+              {lastSyncedTime && (
+                <>
+                  <span className="text-2xs text-slate-400">·</span>
+                  <span className="text-2xs text-emerald-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Synced with Faculty ({lastSyncedTime})
+                  </span>
+                </>
+              )}
             </div>
             <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
               <GraduationCap className="w-5 h-5 text-indigo-400" />
               Student Marksheet & Continuous Evaluation
             </h2>
             <p className="text-xs text-slate-300 max-w-xl">
-              Subject-wise consolidated performance covering Continuous Evaluation (Quizzes, Surprise Tests, Internal Assessments) and End-Semester University Examinations.
+              Real-time consolidated examination performance evaluated and uploaded directly by your course faculty members.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={fetchMarks}
+              disabled={loading}
+              title="Sync latest marks from faculty portal"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white rounded-lg text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{loading ? 'Syncing...' : 'Sync Marks'}</span>
+            </button>
+
             <button
               onClick={() => setShowPrintModal(true)}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 transition-colors cursor-pointer"
             >
               <Download className="w-4 h-4" />
               Official Marksheet (PDF)
@@ -142,22 +527,24 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
             <div className="text-2xs text-slate-400 uppercase font-medium">Semester SGPA</div>
             <div className="text-2xl font-bold font-mono text-emerald-400 mt-0.5 flex items-baseline gap-1.5">
-              {activeMarksheet.sgpa.toFixed(2)}
+              {hasSubjects ? activeMarksheet.sgpa.toFixed(2) : '--'}
               <span className="text-2xs text-slate-400 font-normal">/ 10.0</span>
             </div>
             <div className="text-3xs text-emerald-300/80 flex items-center gap-1 mt-0.5">
               <TrendingUp className="w-3 h-3" />
-              Outstanding Standing
+              {hasSubjects ? (activeMarksheet.sgpa >= 8.5 ? 'Outstanding Standing' : 'Good Standing') : 'Evaluation In Progress'}
             </div>
           </div>
 
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
             <div className="text-2xs text-slate-400 uppercase font-medium">Cumulative CGPA</div>
             <div className="text-2xl font-bold font-mono text-indigo-300 mt-0.5 flex items-baseline gap-1.5">
-              {activeMarksheet.cgpa.toFixed(2)}
+              {hasSubjects ? activeMarksheet.cgpa.toFixed(2) : '--'}
               <span className="text-2xs text-slate-400 font-normal">/ 10.0</span>
             </div>
-            <div className="text-3xs text-indigo-200/80 mt-0.5">Across All Completed Semesters</div>
+            <div className="text-3xs text-indigo-200/80 mt-0.5">
+              {hasSubjects ? 'Across Completed Courses' : 'Awaiting Faculty Submission'}
+            </div>
           </div>
 
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
@@ -168,16 +555,20 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
             </div>
             <div className="text-3xs text-emerald-400 mt-0.5 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" />
-              100% Credits Cleared
+              {hasSubjects
+                ? `${Math.round((activeMarksheet.earnedCredits / (activeMarksheet.totalCredits || 1)) * 100)}% Cleared`
+                : 'Pending Release'}
             </div>
           </div>
 
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
             <div className="text-2xs text-slate-400 uppercase font-medium">Result Status</div>
             <div className="text-base font-bold text-amber-300 mt-1">
-              {activeMarksheet.resultStatus}
+              {hasSubjects ? activeMarksheet.resultStatus : 'Awaiting Evaluation'}
             </div>
-            <div className="text-3xs text-slate-400 mt-0.5">Gazette: {activeMarksheet.publishedDate}</div>
+            <div className="text-3xs text-slate-400 mt-0.5">
+              {hasSubjects ? `Published: ${activeMarksheet.publishedDate}` : 'Faculty Upload Mode'}
+            </div>
           </div>
         </div>
       </div>
@@ -260,7 +651,7 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
           >
             {marksheets.map((m) => (
               <option key={m.semesterId} value={m.semesterId}>
-                {m.semesterName}
+                {m.semesterName} {m.subjects.length > 0 ? `(${m.subjects.length} subjects)` : ''}
               </option>
             ))}
           </select>
@@ -318,98 +709,151 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredSubjects.map((sub) => {
-                return (
-                  <tr
-                    key={sub.subjectCode}
-                    className="hover:bg-slate-50/60 transition-colors"
-                  >
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                        <span className="font-mono text-indigo-600 font-bold text-2xs bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                          {sub.subjectCode}
+              {filteredSubjects.length > 0 ? (
+                filteredSubjects.map((sub) => {
+                  return (
+                    <tr
+                      key={sub.subjectCode}
+                      className="hover:bg-slate-50/60 transition-colors"
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                          <span className="font-mono text-indigo-600 font-bold text-2xs bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                            {sub.subjectCode}
+                          </span>
+                          <span>{sub.subjectName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-2xs text-slate-500">
+                          <span className="font-medium text-slate-600">Faculty: {sub.facultyName}</span>
+                          <span>·</span>
+                          <span className="bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
+                            {sub.category}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-3 text-center font-mono font-medium text-slate-700">
+                        {sub.credits}
+                      </td>
+
+                      {/* Quiz Marks */}
+                      <td className="py-3.5 px-3 text-center bg-cyan-50/20 border-x border-slate-100">
+                        <div className="font-mono font-bold text-cyan-800 tabular-nums">
+                          {sub.quizScore.toFixed(1)}
+                        </div>
+                        <div className="text-3xs text-slate-400">/ 10</div>
+                      </td>
+
+                      {/* Surprise Test Marks */}
+                      <td className="py-3.5 px-3 text-center bg-amber-50/20 border-r border-slate-100">
+                        <div className="font-mono font-bold text-amber-800 tabular-nums">
+                          {sub.surpriseTestScore.toFixed(1)}
+                        </div>
+                        <div className="text-3xs text-slate-400">/ 10</div>
+                      </td>
+
+                      {/* Internals Marks */}
+                      <td className="py-3.5 px-3 text-center bg-indigo-50/20 border-r border-slate-100">
+                        <div className="font-mono font-bold text-indigo-800 tabular-nums">
+                          {sub.internalScore.toFixed(1)}
+                        </div>
+                        <div className="text-3xs text-slate-400">/ 30</div>
+                      </td>
+
+                      {/* Semester Marks */}
+                      <td className="py-3.5 px-3 text-center bg-emerald-50/20 border-r border-slate-100">
+                        <div className="font-mono font-bold text-emerald-800 tabular-nums">
+                          {sub.semesterScore.toFixed(1)}
+                        </div>
+                        <div className="text-3xs text-slate-400">/ 50</div>
+                      </td>
+
+                      {/* Total Marks */}
+                      <td className="py-3.5 px-3 text-center">
+                        <div className="font-mono font-bold text-slate-900 text-sm tabular-nums">
+                          {sub.totalScore.toFixed(1)}
+                        </div>
+                        <div className="text-3xs text-slate-400">/ 100</div>
+                      </td>
+
+                      {/* Grade Badge */}
+                      <td className="py-3.5 px-3 text-center">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-md text-xs border ${getGradeBadge(
+                            sub.grade
+                          )}`}
+                        >
+                          {sub.grade}
                         </span>
-                        <span>{sub.subjectName}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 text-2xs text-slate-500">
-                        <span className="font-medium text-slate-600">Faculty: {sub.facultyName}</span>
-                        <span>·</span>
-                        <span className="bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
-                          {sub.category}
+                      </td>
+
+                      {/* Grade Point */}
+                      <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-700">
+                        {sub.gradePoint.toFixed(1)}
+                      </td>
+
+                      {/* Result Status */}
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-full border ${
+                            sub.status === 'PASS'
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              : 'text-rose-700 bg-rose-50 border-rose-200'
+                          }`}
+                        >
+                          {sub.status === 'PASS' ? (
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <AlertCircle className="w-3 h-3 text-rose-600" />
+                          )}
+                          {sub.status}
                         </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={10} className="py-12 px-4 text-center">
+                    <div className="max-w-md mx-auto space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-600">
+                        <BookOpen className="w-6 h-6" />
                       </div>
-                    </td>
-
-                    <td className="py-3.5 px-3 text-center font-mono font-medium text-slate-700">
-                      {sub.credits}
-                    </td>
-
-                    {/* Quiz Marks */}
-                    <td className="py-3.5 px-3 text-center bg-cyan-50/20 border-x border-slate-100">
-                      <div className="font-mono font-bold text-cyan-800 tabular-nums">
-                        {sub.quizScore.toFixed(1)}
+                      <div className="text-sm font-bold text-slate-800">
+                        {searchQuery || selectedCategory !== 'all'
+                          ? 'No subjects match your current filter'
+                          : `No Marks Published Yet for ${activeMarksheet.semesterName}`}
                       </div>
-                      <div className="text-3xs text-slate-400">/ 10</div>
-                    </td>
-
-                    {/* Surprise Test Marks */}
-                    <td className="py-3.5 px-3 text-center bg-amber-50/20 border-r border-slate-100">
-                      <div className="font-mono font-bold text-amber-800 tabular-nums">
-                        {sub.surpriseTestScore.toFixed(1)}
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        {searchQuery || selectedCategory !== 'all'
+                          ? 'Try resetting the search keyword or selecting "All Categories".'
+                          : 'Course faculty members have not published evaluation marksheets for your roll number yet. Once published via the Faculty Portal, your scores will automatically appear here in real time.'}
+                      </p>
+                      <div className="pt-2 flex items-center justify-center gap-3">
+                        <button
+                          onClick={fetchMarks}
+                          disabled={loading}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                          {loading ? 'Checking Records...' : 'Check For Newly Published Marks'}
+                        </button>
+                        {(searchQuery || selectedCategory !== 'all') && (
+                          <button
+                            onClick={() => {
+                              setSearchQuery('');
+                              setSelectedCategory('all');
+                            }}
+                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                          >
+                            Reset Filters
+                          </button>
+                        )}
                       </div>
-                      <div className="text-3xs text-slate-400">/ 10</div>
-                    </td>
-
-                    {/* Internals Marks */}
-                    <td className="py-3.5 px-3 text-center bg-indigo-50/20 border-r border-slate-100">
-                      <div className="font-mono font-bold text-indigo-800 tabular-nums">
-                        {sub.internalScore.toFixed(1)}
-                      </div>
-                      <div className="text-3xs text-slate-400">/ 30</div>
-                    </td>
-
-                    {/* Semester Marks */}
-                    <td className="py-3.5 px-3 text-center bg-emerald-50/20 border-r border-slate-100">
-                      <div className="font-mono font-bold text-emerald-800 tabular-nums">
-                        {sub.semesterScore.toFixed(1)}
-                      </div>
-                      <div className="text-3xs text-slate-400">/ 50</div>
-                    </td>
-
-                    {/* Total Marks */}
-                    <td className="py-3.5 px-3 text-center">
-                      <div className="font-mono font-bold text-slate-900 text-sm tabular-nums">
-                        {sub.totalScore.toFixed(1)}
-                      </div>
-                      <div className="text-3xs text-slate-400">/ 100</div>
-                    </td>
-
-                    {/* Grade Badge */}
-                    <td className="py-3.5 px-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-md text-xs border ${getGradeBadge(
-                          sub.grade
-                        )}`}
-                      >
-                        {sub.grade}
-                      </span>
-                    </td>
-
-                    {/* Grade Point */}
-                    <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-700">
-                      {sub.gradePoint.toFixed(1)}
-                    </td>
-
-                    {/* Result Status */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 text-2xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        {sub.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -421,91 +865,88 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
           </div>
           <div className="flex items-center gap-4 font-mono">
             <span>Semester Credits: <strong className="text-slate-900">{activeMarksheet.earnedCredits}</strong></span>
-            <span>SGPA: <strong className="text-emerald-700">{activeMarksheet.sgpa.toFixed(2)}</strong></span>
-            <span>CGPA: <strong className="text-indigo-700">{activeMarksheet.cgpa.toFixed(2)}</strong></span>
+            <span>SGPA: <strong className="text-emerald-700">{hasSubjects ? activeMarksheet.sgpa.toFixed(2) : '--'}</strong></span>
+            <span>CGPA: <strong className="text-indigo-700">{hasSubjects ? activeMarksheet.cgpa.toFixed(2) : '--'}</strong></span>
           </div>
         </div>
       </div>
 
       {/* Visual Component Distribution Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredSubjects.map((sub) => {
-          const quizPct = (sub.quizScore / 10) * 100;
-          const surprisePct = (sub.surpriseTestScore / 10) * 100;
-          const internalPct = (sub.internalScore / 30) * 100;
-          const semPct = (sub.semesterScore / 50) * 100;
+      {filteredSubjects.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredSubjects.map((sub) => {
+            return (
+              <div
+                key={`card-${sub.subjectCode}`}
+                className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                        {sub.subjectCode}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900">{sub.subjectName}</h4>
+                    </div>
+                    <div className="text-2xs text-slate-500 mt-0.5">Faculty: {sub.facultyName}</div>
+                  </div>
 
-          return (
-            <div
-              key={`card-${sub.subjectCode}`}
-              className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                      {sub.subjectCode}
+                  <div className="text-right">
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-xs border ${getGradeBadge(
+                        sub.grade
+                      )}`}
+                    >
+                      Grade {sub.grade} ({sub.gradePoint} GP)
                     </span>
-                    <h4 className="text-xs font-bold text-slate-900">{sub.subjectName}</h4>
+                    <div className="text-2xs font-mono text-slate-500 mt-0.5">
+                      {sub.totalScore} / 100
+                    </div>
                   </div>
-                  <div className="text-2xs text-slate-500 mt-0.5">Faculty: {sub.facultyName}</div>
                 </div>
 
-                <div className="text-right">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded text-xs border ${getGradeBadge(
-                      sub.grade
-                    )}`}
-                  >
-                    Grade {sub.grade} ({sub.gradePoint} GP)
-                  </span>
-                  <div className="text-2xs font-mono text-slate-500 mt-0.5">
-                    {sub.totalScore} / 100
+                {/* Stacked bar representation */}
+                <div className="space-y-1.5 text-2xs">
+                  <div className="flex justify-between text-3xs text-slate-500">
+                    <span>Evaluation Components</span>
+                    <span className="font-mono">{sub.totalScore}% Aggregate</span>
+                  </div>
+
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full flex overflow-hidden">
+                    <div
+                      style={{ width: `${(sub.quizScore / 100) * 100}%` }}
+                      className="bg-cyan-500"
+                      title={`Quiz: ${sub.quizScore}/10`}
+                    />
+                    <div
+                      style={{ width: `${(sub.surpriseTestScore / 100) * 100}%` }}
+                      className="bg-amber-500"
+                      title={`Surprise Test: ${sub.surpriseTestScore}/10`}
+                    />
+                    <div
+                      style={{ width: `${(sub.internalScore / 100) * 100}%` }}
+                      className="bg-indigo-500"
+                      title={`Internals: ${sub.internalScore}/30`}
+                    />
+                    <div
+                      style={{ width: `${(sub.semesterScore / 100) * 100}%` }}
+                      className="bg-emerald-500"
+                      title={`Semester Exam: ${sub.semesterScore}/50`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-1 text-center pt-1 text-3xs">
+                    <span className="text-cyan-800 font-medium">QZ: {sub.quizScore}/10</span>
+                    <span className="text-amber-800 font-medium">ST: {sub.surpriseTestScore}/10</span>
+                    <span className="text-indigo-800 font-medium">INT: {sub.internalScore}/30</span>
+                    <span className="text-emerald-800 font-medium">SEM: {sub.semesterScore}/50</span>
                   </div>
                 </div>
               </div>
-
-              {/* Stacked bar representation */}
-              <div className="space-y-1.5 text-2xs">
-                <div className="flex justify-between text-3xs text-slate-500">
-                  <span>Evaluation Components</span>
-                  <span className="font-mono">{sub.totalScore}% Aggregate</span>
-                </div>
-
-                <div className="w-full h-2.5 bg-slate-100 rounded-full flex overflow-hidden">
-                  <div
-                    style={{ width: `${(sub.quizScore / 100) * 100}%` }}
-                    className="bg-cyan-500"
-                    title={`Quiz: ${sub.quizScore}/10`}
-                  />
-                  <div
-                    style={{ width: `${(sub.surpriseTestScore / 100) * 100}%` }}
-                    className="bg-amber-500"
-                    title={`Surprise Test: ${sub.surpriseTestScore}/10`}
-                  />
-                  <div
-                    style={{ width: `${(sub.internalScore / 100) * 100}%` }}
-                    className="bg-indigo-500"
-                    title={`Internals: ${sub.internalScore}/30`}
-                  />
-                  <div
-                    style={{ width: `${(sub.semesterScore / 100) * 100}%` }}
-                    className="bg-emerald-500"
-                    title={`Semester Exam: ${sub.semesterScore}/50`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-4 gap-1 text-center pt-1 text-3xs">
-                  <span className="text-cyan-800 font-medium">QZ: {sub.quizScore}/10</span>
-                  <span className="text-amber-800 font-medium">ST: {sub.surpriseTestScore}/10</span>
-                  <span className="text-indigo-800 font-medium">INT: {sub.internalScore}/30</span>
-                  <span className="text-emerald-800 font-medium">SEM: {sub.semesterScore}/50</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* OFFICIAL MARKSHEET / GRADE CARD PRINT MODAL */}
       {showPrintModal && (
@@ -571,7 +1012,7 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
                 </div>
                 <div>
                   <div className="text-3xs uppercase text-slate-500 font-semibold">Branch / Program</div>
-                  <div className="font-semibold text-slate-900">CSE (B.Tech)</div>
+                  <div className="font-semibold text-slate-900">{branch}</div>
                 </div>
                 <div>
                   <div className="text-3xs uppercase text-slate-500 font-semibold">Academic Session</div>
@@ -597,40 +1038,48 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {activeMarksheet.subjects.map((s) => (
-                      <tr key={`print-${s.subjectCode}`}>
-                        <td className="p-2 font-mono font-semibold border-r border-slate-200">
-                          {s.subjectCode}
-                        </td>
-                        <td className="p-2 border-r border-slate-200 font-medium">
-                          {s.subjectName}
-                        </td>
-                        <td className="p-2 text-center font-mono border-r border-slate-200">
-                          {s.credits}
-                        </td>
-                        <td className="p-2 text-center font-mono border-r border-slate-200">
-                          {s.quizScore.toFixed(1)}
-                        </td>
-                        <td className="p-2 text-center font-mono border-r border-slate-200">
-                          {s.surpriseTestScore.toFixed(1)}
-                        </td>
-                        <td className="p-2 text-center font-mono border-r border-slate-200">
-                          {s.internalScore.toFixed(1)}
-                        </td>
-                        <td className="p-2 text-center font-mono border-r border-slate-200">
-                          {s.semesterScore.toFixed(1)}
-                        </td>
-                        <td className="p-2 text-center font-mono font-bold border-r border-slate-200">
-                          {s.totalScore.toFixed(1)}
-                        </td>
-                        <td className="p-2 text-center font-bold border-r border-slate-200">
-                          {s.grade}
-                        </td>
-                        <td className="p-2 text-center font-semibold text-emerald-700">
-                          {s.status}
+                    {activeMarksheet.subjects.length > 0 ? (
+                      activeMarksheet.subjects.map((s) => (
+                        <tr key={`print-${s.subjectCode}`}>
+                          <td className="p-2 font-mono font-semibold border-r border-slate-200">
+                            {s.subjectCode}
+                          </td>
+                          <td className="p-2 border-r border-slate-200 font-medium">
+                            {s.subjectName}
+                          </td>
+                          <td className="p-2 text-center font-mono border-r border-slate-200">
+                            {s.credits}
+                          </td>
+                          <td className="p-2 text-center font-mono border-r border-slate-200">
+                            {s.quizScore.toFixed(1)}
+                          </td>
+                          <td className="p-2 text-center font-mono border-r border-slate-200">
+                            {s.surpriseTestScore.toFixed(1)}
+                          </td>
+                          <td className="p-2 text-center font-mono border-r border-slate-200">
+                            {s.internalScore.toFixed(1)}
+                          </td>
+                          <td className="p-2 text-center font-mono border-r border-slate-200">
+                            {s.semesterScore.toFixed(1)}
+                          </td>
+                          <td className="p-2 text-center font-mono font-bold border-r border-slate-200">
+                            {s.totalScore.toFixed(1)}
+                          </td>
+                          <td className="p-2 text-center font-bold border-r border-slate-200">
+                            {s.grade}
+                          </td>
+                          <td className="p-2 text-center font-semibold text-emerald-700">
+                            {s.status}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={10} className="p-6 text-center text-slate-500 italic">
+                          Continuous evaluation records in progress. Faculty marks will be officially reflected upon publication.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -638,12 +1087,15 @@ export const StudentMarksheetView: React.FC<StudentMarksheetViewProps> = ({
               {/* Calculation Summary Footer */}
               <div className="font-sans flex flex-col sm:flex-row items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs gap-3">
                 <div>
-                  Result: <strong className="text-emerald-700">{activeMarksheet.resultStatus}</strong>
+                  Result:{' '}
+                  <strong className={activeMarksheet.resultStatus === 'PASS' ? 'text-emerald-700' : 'text-amber-700'}>
+                    {hasSubjects ? activeMarksheet.resultStatus : 'Awaiting Publication'}
+                  </strong>
                 </div>
                 <div className="flex items-center gap-6 font-mono font-bold">
                   <span>Total Credits: {activeMarksheet.earnedCredits}</span>
-                  <span>SGPA: {activeMarksheet.sgpa.toFixed(2)}</span>
-                  <span>CGPA: {activeMarksheet.cgpa.toFixed(2)}</span>
+                  <span>SGPA: {hasSubjects ? activeMarksheet.sgpa.toFixed(2) : '--'}</span>
+                  <span>CGPA: {hasSubjects ? activeMarksheet.cgpa.toFixed(2) : '--'}</span>
                 </div>
               </div>
 

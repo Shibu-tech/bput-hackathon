@@ -416,6 +416,13 @@ export const FacultyDashboard: React.FC = () => {
       const resData = await res.json();
       setMarksheets((prev) => [resData.data, ...prev]);
       setActionSuccess(`Marksheet for ${marksSubject} (${marksExamType}) successfully published!`);
+      // Dispatch real-time events for Student Marksheet View
+      window.dispatchEvent(new Event('marks_updated'));
+      try {
+        localStorage.setItem('marks_last_updated', Date.now().toString());
+      } catch {
+        // ignore
+      }
     } catch (err: any) {
       setActionError(err.message || 'Could not upload marksheet.');
     } finally {
@@ -438,6 +445,13 @@ export const FacultyDashboard: React.FC = () => {
 
       setMarksheets((prev) => prev.filter((m) => m._id !== id));
       setActionSuccess('Marksheet removed.');
+      // Dispatch real-time events for Student Marksheet View
+      window.dispatchEvent(new Event('marks_updated'));
+      try {
+        localStorage.setItem('marks_last_updated', Date.now().toString());
+      } catch {
+        // ignore
+      }
     } catch (err: any) {
       setActionError(err.message || 'Could not delete marksheet.');
     }
