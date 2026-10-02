@@ -35,7 +35,8 @@ export const AdminPortal: React.FC = () => {
     staffRequests,
     approveStaffRequest,
     rejectStaffRequest,
-    refreshStaffRequests,
+    language,
+    setLanguage,
   } = useCampusOps();
 
   React.useEffect(() => {
@@ -800,10 +801,14 @@ export const AdminPortal: React.FC = () => {
                       Language
                     </span>
 
-                    <select className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <select
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value as any)}
+                      className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
                       <option value="en">English</option>
-                      <option value="hi">Hindi</option>
-                      <option value="te">Telugu</option>
+                      <option value="or">ଓଡ଼ିଆ (Odia)</option>
+                      <option value="hi">हिन्दी (Hindi)</option>
                     </select>
                   </label>
                 </div>

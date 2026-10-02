@@ -29,6 +29,8 @@ import {
   FileText,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
+import { StudentMarksheetView } from './StudentMarksheetView';
+import { StudentCertificateView } from './StudentCertificateView';
 
 export const StudentPortal: React.FC = () => {
   const {
@@ -56,6 +58,7 @@ export const StudentPortal: React.FC = () => {
 
   // Active sub-tab for student portal
   const [activeTab, setActiveTab] = useState<'passes' | 'rooms' | 'complaints' | 'mess' | 'academics'>('passes');
+  const [academicSubTab, setAcademicSubTab] = useState<'marks' | 'certificates' | 'schedule' | 'notes'>('marks');
 
   // Gate Pass Form State
   const [showPassModal, setShowPassModal] = useState(false);
@@ -382,11 +385,10 @@ export const StudentPortal: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${
-                  isActive
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${isActive
                     ? 'bg-white text-slate-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
@@ -551,17 +553,16 @@ export const StudentPortal: React.FC = () => {
                         </td>
                         <td className="py-3">
                           <span
-                            className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${
-                              p.status === 'approved'
+                            className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${p.status === 'approved'
                                 ? 'bg-emerald-50 text-emerald-700'
                                 : p.status === 'checked_out'
-                                ? 'bg-blue-50 text-blue-700'
-                                : p.status === 'completed'
-                                ? 'bg-slate-100 text-slate-600'
-                                : p.status === 'overdue'
-                                ? 'bg-red-50 text-red-700 font-bold'
-                                : 'bg-amber-50 text-amber-700'
-                            }`}
+                                  ? 'bg-blue-50 text-blue-700'
+                                  : p.status === 'completed'
+                                    ? 'bg-slate-100 text-slate-600'
+                                    : p.status === 'overdue'
+                                      ? 'bg-red-50 text-red-700 font-bold'
+                                      : 'bg-amber-50 text-amber-700'
+                              }`}
                           >
                             {p.status.replace('_', ' ')}
                           </span>
@@ -608,11 +609,10 @@ export const StudentPortal: React.FC = () => {
                 return (
                   <div
                     key={room.id}
-                    className={`border rounded-xl p-4 transition-all ${
-                      isSelected
+                    className={`border rounded-xl p-4 transition-all ${isSelected
                         ? 'border-indigo-600 ring-2 ring-indigo-50 bg-indigo-50/10'
                         : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -638,13 +638,12 @@ export const StudentPortal: React.FC = () => {
                       {room.beds.map((bed) => (
                         <div
                           key={bed.id}
-                          className={`p-2.5 rounded-lg border text-xs ${
-                            bed.isOccupied
+                          className={`p-2.5 rounded-lg border text-xs ${bed.isOccupied
                               ? 'bg-slate-50 border-slate-200 text-slate-600'
                               : isSelected && selectedBedLabel === bed.bedLabel
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-emerald-50/60 border-emerald-200 text-emerald-900 hover:border-emerald-400 cursor-pointer'
-                          }`}
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-emerald-50/60 border-emerald-200 text-emerald-900 hover:border-emerald-400 cursor-pointer'
+                            }`}
                           onClick={() => {
                             if (!bed.isOccupied) {
                               setSelectedRoomId(room.id);
@@ -738,9 +737,8 @@ export const StudentPortal: React.FC = () => {
                 return (
                   <div
                     key={c.id}
-                    className={`border rounded-xl p-4 transition-all ${
-                      isMine ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200 bg-white'
-                    }`}
+                    className={`border rounded-xl p-4 transition-all ${isMine ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200 bg-white'
+                      }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -758,23 +756,22 @@ export const StudentPortal: React.FC = () => {
 
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${
-                            c.status === 'resolved'
+                          className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${c.status === 'resolved'
                               ? 'bg-emerald-50 text-emerald-700'
                               : c.status === 'in_progress'
-                              ? 'bg-blue-50 text-blue-700'
-                              : c.status === 'rejected'
-                              ? 'bg-rose-50 text-rose-700 font-bold'
-                              : c.status === 'assigned'
-                              ? 'bg-indigo-50 text-indigo-700'
-                              : 'bg-amber-50 text-amber-700 font-semibold'
-                          }`}
+                                ? 'bg-blue-50 text-blue-700'
+                                : c.status === 'rejected'
+                                  ? 'bg-rose-50 text-rose-700 font-bold'
+                                  : c.status === 'assigned'
+                                    ? 'bg-indigo-50 text-indigo-700'
+                                    : 'bg-amber-50 text-amber-700 font-semibold'
+                            }`}
                         >
                           {c.status === 'open'
                             ? 'Awaiting Warden Dispatch'
                             : c.status === 'assigned'
-                            ? 'Technician Dispatched'
-                            : c.status.replace('_', ' ')}
+                              ? 'Technician Dispatched'
+                              : c.status.replace('_', ' ')}
                         </span>
                         <button
                           onClick={() => upvoteComplaint(c.id)}
@@ -1042,18 +1039,16 @@ export const StudentPortal: React.FC = () => {
                 return (
                   <div
                     key={food.id}
-                    className={`border rounded-lg p-3 space-y-2 transition-all ${
-                      isOutOfStock
+                    className={`border rounded-lg p-3 space-y-2 transition-all ${isOutOfStock
                         ? 'border-slate-200 bg-slate-50/80 opacity-80'
                         : 'border-slate-200 rounded-lg bg-white shadow-2xs hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between text-2xs text-slate-500">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`w-2 h-2 rounded-full ${
-                            food.veg ? 'bg-emerald-500' : 'bg-rose-500'
-                          }`}
+                          className={`w-2 h-2 rounded-full ${food.veg ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`}
                           title={food.veg ? 'Pure Veg' : 'Non-Veg'}
                         />
                         {food.tag && (
@@ -1128,17 +1123,16 @@ export const StudentPortal: React.FC = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-slate-900 text-xs">{o.orderNumber}</span>
                             <span
-                              className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded border ${
-                                o.status === 'cancelled'
+                              className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded border ${o.status === 'cancelled'
                                   ? 'bg-rose-100 text-rose-800 border-rose-200'
                                   : o.status === 'delivered'
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                  : o.status === 'out_for_delivery'
-                                  ? 'bg-purple-100 text-purple-800 border-purple-200'
-                                  : o.status === 'preparing'
-                                  ? 'bg-amber-100 text-amber-800 border-amber-200'
-                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                              }`}
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                    : o.status === 'out_for_delivery'
+                                      ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                      : o.status === 'preparing'
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                }`}
                             >
                               {o.status.replace('_', ' ')}
                             </span>
@@ -1250,11 +1244,10 @@ export const StudentPortal: React.FC = () => {
                                         title={`${star} Star${star > 1 ? 's' : ''}`}
                                       >
                                         <Star
-                                          className={`w-5 h-5 ${
-                                            star <= reviewRating
+                                          className={`w-5 h-5 ${star <= reviewRating
                                               ? 'fill-amber-400 text-amber-400 drop-shadow-xs'
                                               : 'text-slate-300 hover:text-amber-300'
-                                          }`}
+                                            }`}
                                         />
                                       </button>
                                     ))}
@@ -1263,12 +1256,12 @@ export const StudentPortal: React.FC = () => {
                                     {reviewRating === 5
                                       ? '5.0 - Excellent! 🔥'
                                       : reviewRating === 4
-                                      ? '4.0 - Very Good 👍'
-                                      : reviewRating === 3
-                                      ? '3.0 - Average 🙂'
-                                      : reviewRating === 2
-                                      ? '2.0 - Below Expectations 😕'
-                                      : '1.0 - Poor 😞'}
+                                        ? '4.0 - Very Good 👍'
+                                        : reviewRating === 3
+                                          ? '3.0 - Average 🙂'
+                                          : reviewRating === 2
+                                            ? '2.0 - Below Expectations 😕'
+                                            : '1.0 - Poor 😞'}
                                   </span>
                                 </div>
 
@@ -1332,9 +1325,8 @@ export const StudentPortal: React.FC = () => {
                                       {Array.from({ length: 5 }).map((_, i) => (
                                         <Star
                                           key={i}
-                                          className={`w-3.5 h-3.5 ${
-                                            i < o.rating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
-                                          }`}
+                                          className={`w-3.5 h-3.5 ${i < o.rating! ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
+                                            }`}
                                         />
                                       ))}
                                     </div>
@@ -1389,428 +1381,526 @@ export const StudentPortal: React.FC = () => {
 
       {/* SUB-VIEW 5: ACADEMICS & NO-DUES CLEARANCES */}
       {activeTab === 'academics' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-900">
-              Academic Attendance & Schedule Visibility
-            </h2>
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-              <div>
-                <div className="text-2xs uppercase text-slate-500 font-semibold">
-                  Cumulative Semester Attendance
-                </div>
-                <div className="text-2xl font-bold font-mono text-emerald-600 tabular-nums">
-                  88.5%
-                </div>
-                <div className="text-2xs text-slate-500 mt-0.5">Above mandatory 75% threshold</div>
-              </div>
-              <div className="w-12 h-12 rounded-full border-4 border-emerald-500 flex items-center justify-center font-bold text-xs text-emerald-700 bg-white">
-                Safe
-              </div>
+        <div className="space-y-6">
+          {/* Sub-navigation inside Academics */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
+              <button
+                onClick={() => setAcademicSubTab('marks')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'marks'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Subject-Wise Marksheet</span>
+              </button>
+
+              <button
+                onClick={() => setAcademicSubTab('certificates')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'certificates'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <Award className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Certificates & No-Due Requests</span>
+              </button>
+
+              <button
+                onClick={() => setAcademicSubTab('notes')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'notes'
+                    ? 'bg-white text-purple-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-600" />
+                <span>Faculty Notes ({academicNotes.length})</span>
+              </button>
+
+              <button
+                onClick={() => setAcademicSubTab('schedule')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'schedule'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-slate-600" />
+                <span>Attendance & Timetable</span>
+              </button>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div className="font-semibold text-slate-700">Today's Class Timetable</div>
-              {[
-                { time: '09:00 - 10:30', course: 'CS301: Advanced Data Structures & Algorithms', hall: 'Lecture Hall 102' },
-                { time: '11:00 - 12:30', course: 'CS304: Computer Networks & Socket Programming', hall: 'Lab 4 (Systems Wing)' },
-                { time: '14:30 - 16:00', course: 'CS309: Cloud & Distributed Operating Systems', hall: 'Seminar Room B' },
-              ].map((c, i) => (
-                <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-md flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-slate-900">{c.course}</div>
-                    <div className="text-2xs text-slate-500">{c.hall}</div>
-                  </div>
-                  <span className="font-mono text-2xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                    {c.time}
-                  </span>
-                </div>
-              ))}
+            <div className="flex items-center gap-3 text-2xs text-slate-500 pr-2">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Semester 5 (Autumn 2024)
+              </span>
+              <span>·</span>
+              <span className="font-mono text-slate-700 font-semibold">{studentRoll}</span>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold text-slate-900">
-              Zero-Queue Clearance & No-Dues Certificate
-            </h2>
-            <p className="text-xs text-slate-500">
-              Digital automated reconciliation across hostel, central library, laboratory, and accounts departments.
-            </p>
+          {/* Sub-view: Subject-Wise Marksheet */}
+          {academicSubTab === 'marks' && (
+            <div className="space-y-6">
+              <StudentMarksheetView
+                studentName={studentDisplayName}
+                studentRoll={studentRoll}
+              />
 
-            <div className="space-y-2 text-xs">
-              {[
-                { dept: 'Hostel Maintenance & Mess Fee', status: 'Cleared (Nil)', verified: true },
-                { dept: 'Central University Library', status: 'Cleared (0 Books Overdue)', verified: true },
-                { dept: 'Computer Science Department Lab', status: 'Equipment Returned', verified: true },
-                { dept: 'Sports Equipment & Gym Store', status: 'No Active Borrows', verified: true },
-              ].map((d, i) => (
-                <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="font-medium text-slate-800">{d.dept}</span>
-                  <span className="text-emerald-700 font-medium flex items-center gap-1 text-2xs">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {d.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => alert('Digital Signed No-Dues Certificate verified! PDF generated with university cryptographic seal.')}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer text-center"
-            >
-              Download Provisional No-Dues Certificate (PDF)
-            </button>
-          </div>
-
-          {/* FACULTY STUDY NOTES & COURSEWARE */}
-          <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">Faculty Study Notes & Learning Materials</h3>
-              </div>
-              <span className="text-xs text-slate-400 font-semibold">{academicNotes.length} Documents Available</span>
-            </div>
-
-            {academicNotes.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                No study notes published yet for your batch. Check back soon!
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {academicNotes.map((note) => (
-                  <div key={note._id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-indigo-300 transition-all flex flex-col justify-between space-y-2">
-                    <div>
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="px-1.5 py-0.5 rounded text-3xs font-extrabold uppercase bg-indigo-50 text-indigo-700">
-                          {note.category}
-                        </span>
-                        <span className="text-3xs text-slate-400 font-mono">{note.fileSize || 'PDF'}</span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-900 leading-snug">{note.title}</h4>
-                      <p className="text-3xs text-slate-500 mt-0.5">{note.subject} · {note.semester}</p>
+              {academicMarks.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-purple-600" />
+                      <h3 className="text-sm font-bold text-slate-900">Faculty Published Examination Marksheets</h3>
                     </div>
-
-                    <a
-                      href={note.fileUrl}
-                      download={note.fileName}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-2xs transition-colors cursor-pointer mt-2"
-                    >
-                      <Download className="w-3 h-3" />
-                      <span>Download File</span>
-                    </a>
+                    <span className="text-xs text-slate-400 font-semibold">{academicMarks.length} Marksheets</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* FACULTY PUBLISHED MARKS */}
-          <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Award className="w-4 h-4 text-purple-600" />
-                <h3 className="text-sm font-bold text-slate-900">Published Marksheets & Academic Grades</h3>
-              </div>
-              <span className="text-xs text-slate-400 font-semibold">{academicMarks.length} Marksheets</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {academicMarks.map((m) => {
+                      const myRecord = m.records?.find((r: any) =>
+                        r.studentName?.toLowerCase() === studentDisplayName.toLowerCase() ||
+                        r.rollNumber === studentRoll
+                      );
+
+                      return (
+                        <div key={m._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xs font-extrabold uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                              {m.examType}
+                            </span>
+                            <span className="text-3xs text-slate-400 font-medium">Batch {m.batch}</span>
+                          </div>
+                          <h4 className="text-xs font-bold text-slate-900">{m.subject}</h4>
+                          <p className="text-2xs text-slate-500">{m.semester} · Max Marks: {m.maxMarks}</p>
+
+                          {myRecord ? (
+                            <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                              <span className="text-2xs font-bold text-slate-700">
+                                Score: <span className="text-indigo-600 text-xs">{myRecord.marksObtained}</span> / {m.maxMarks}
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-2xs">
+                                Grade: {myRecord.grade || 'A'}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="pt-2 border-t border-slate-200/80 text-3xs text-slate-400 italic">
+                              Class marksheet available (Passing marks: {m.passingMarks})
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
+          )}
 
-            {academicMarks.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                No marks published yet for your semester examinations.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {academicMarks.map((m) => {
-                  const myRecord = m.records?.find((r: any) =>
-                    r.studentName?.toLowerCase() === studentDisplayName.toLowerCase() ||
-                    r.rollNumber === studentRoll
-                  );
+          {academicSubTab === 'certificates' && (
+            <StudentCertificateView
+              studentName={studentDisplayName}
+              studentRoll={studentRoll}
+            />
+          )}
 
-                  return (
-                    <div key={m._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xs font-extrabold uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-                          {m.examType}
-                        </span>
-                        <span className="text-3xs text-slate-400 font-medium">Batch {m.batch}</span>
+          {academicSubTab === 'schedule' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Academic Attendance & Schedule Visibility
+                  </h2>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                    <div>
+                      <div className="text-2xs uppercase text-slate-500 font-semibold">
+                        Cumulative Semester Attendance
                       </div>
-                      <h4 className="text-xs font-bold text-slate-900">{m.subject}</h4>
-                      <p className="text-2xs text-slate-500">{m.semester} · Max Marks: {m.maxMarks}</p>
+                      <div className="text-2xl font-bold font-mono text-emerald-600 tabular-nums">
+                        88.5%
+                      </div>
+                      <div className="text-2xs text-slate-500 mt-0.5">Above mandatory 75% threshold</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-full border-4 border-emerald-500 flex items-center justify-center font-bold text-xs text-emerald-700 bg-white">
+                      Safe
+                    </div>
+                  </div>
 
-                      {myRecord ? (
-                        <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                          <span className="text-2xs font-bold text-slate-700">
-                            Score: <span className="text-indigo-600 text-xs">{myRecord.marksObtained}</span> / {m.maxMarks}
+                  <div className="space-y-2 text-xs">
+                    <div className="font-semibold text-slate-700">Today's Class Timetable</div>
+                    {[
+                      { time: '09:00 - 10:30', course: 'CS301: Advanced Data Structures & Algorithms', hall: 'Lecture Hall 102' },
+                      { time: '11:00 - 12:30', course: 'CS304: Computer Networks & Socket Programming', hall: 'Lab 4 (Systems Wing)' },
+                      { time: '14:30 - 16:00', course: 'CS309: Cloud & Distributed Operating Systems', hall: 'Seminar Room B' },
+                    ].map((c, i) => (
+                      <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-md flex justify-between items-center">
+                        <div>
+                          <div className="font-medium text-slate-900">{c.course}</div>
+                          <div className="text-2xs text-slate-500">{c.hall}</div>
+                        </div>
+                        <span className="font-mono text-2xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                          {c.time}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Quick Academic Services
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    One-click access to academic evaluations, certificates, and institutional clearances.
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <button
+                      onClick={() => setAcademicSubTab('certificates')}
+                      className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-left transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
+                          <Award className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            Request No-Due & Bonafide Certificates
+                          </div>
+                          <div className="text-2xs text-slate-500">
+                            5/5 Departments cleared · Ready for instant download
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-emerald-700">Open &rarr;</span>
+                    </button>
+
+                    <button
+                      onClick={() => setAcademicSubTab('marks')}
+                      className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-left transition-colors cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
+                          <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            Subject Marksheet & Continuous Evaluation
+                          </div>
+                          <div className="text-2xs text-slate-500">
+                            Internals, Semester, Quiz & Surprise Test marks
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-indigo-700">Open &rarr;</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-2xs text-slate-600 space-y-1">
+                    <div className="font-semibold text-slate-800">Need exam or syllabus assistance?</div>
+                    <div>Contact the Department Academic Advisor at <span className="font-mono text-indigo-600">advisor.cse@bput.ac.in</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-view: Faculty Study Notes */}
+          {academicSubTab === 'notes' && (
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-sm font-bold text-slate-900">Faculty Study Notes & Learning Materials</h3>
+                </div>
+                <span className="text-xs text-slate-400 font-semibold">{academicNotes.length} Documents Available</span>
+              </div>
+
+              {academicNotes.length === 0 ? (
+                <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                  No study notes published yet for your batch. Check back soon!
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {academicNotes.map((note) => (
+                    <div key={note._id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-indigo-300 transition-all flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="px-1.5 py-0.5 rounded text-3xs font-extrabold uppercase bg-indigo-50 text-indigo-700">
+                            {note.category}
                           </span>
-                          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-2xs">
-                            Grade: {myRecord.grade || 'A'}
-                          </span>
+                          <span className="text-3xs text-slate-400 font-mono">{note.fileSize || 'PDF'}</span>
+                        </div>
+                        <h4 className="text-xs font-bold text-slate-900 leading-snug">{note.title}</h4>
+                        <p className="text-3xs text-slate-500 mt-0.5">{note.subject} · {note.semester}</p>
+                      </div>
+
+                      <a
+                        href={note.fileUrl}
+                        download={note.fileName}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-2xs transition-colors cursor-pointer mt-2"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download File</span>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+                {/* MODAL: REQUEST GATE PASS */}
+                {showPassModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <h3 className="text-sm font-bold text-slate-900">Request Digital Gate Pass</h3>
+                        <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
+                          ✕
+                        </button>
+                      </div>
+
+                      {passSuccessMessage ? (
+                        <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
+                          {passSuccessMessage}
                         </div>
                       ) : (
-                        <div className="pt-2 border-t border-slate-200/80 text-3xs text-slate-400 italic">
-                          Class marksheet available (Passing marks: {m.passingMarks})
-                        </div>
+                        <form onSubmit={handleCreatePass} className="space-y-3 text-xs">
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Pass Category</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { id: 'late_night', label: 'Late Night' },
+                                { id: 'weekend_leave', label: 'Weekend Leave' },
+                                { id: 'day', label: 'Day Pass' },
+                              ].map((t) => (
+                                <button
+                                  type="button"
+                                  key={t.id}
+                                  onClick={() => setPassType(t.id as PassType)}
+                                  className={`py-2 text-center rounded border cursor-pointer ${passType === t.id
+                                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold'
+                                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                  {t.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Destination</label>
+                            <input
+                              type="text"
+                              required
+                              value={destination}
+                              onChange={(e) => setDestination(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              placeholder="e.g. Central City Library, Pune Hometown, etc."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Purpose of Visit</label>
+                            <input
+                              type="text"
+                              required
+                              value={purpose}
+                              onChange={(e) => setPurpose(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              placeholder="Brief description for security records"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block font-semibold text-slate-700 mb-1">Out Time</label>
+                              <input
+                                type="text"
+                                value={outTime}
+                                onChange={(e) => setOutTime(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block font-semibold text-slate-700 mb-1">Expected In Time</label>
+                              <input
+                                type="text"
+                                value={expectedInTime}
+                                onChange={(e) => setExpectedInTime(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Parent Phone (SMS Verification)</label>
+                            <input
+                              type="text"
+                              value={parentPhone}
+                              onChange={(e) => setParentPhone(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md font-mono"
+                            />
+                            <span className="text-3xs text-slate-400 mt-0.5 block">
+                              Automated SMS consent link will be dispatched immediately.
+                            </span>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowPassModal(false)}
+                              className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded shadow-xs"
+                            >
+                              Submit Gate Pass
+                            </button>
+                          </div>
+                        </form>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* MODAL: LOG MAINTENANCE COMPLAINT */}
+                {showComplaintModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Register Maintenance Requisition</h3>
+                          <p className="text-2xs text-slate-500">Submitted directly to Hostel Warden Desk. The Warden will assign the duty technician.</p>
+                        </div>
+                        <button onClick={() => setShowComplaintModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
+                          ✕
+                        </button>
+                      </div>
+
+                      {complaintSuccess ? (
+                        <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
+                          {complaintSuccess}
+                        </div>
+                      ) : (
+                        <form onSubmit={handleCreateComplaint} className="space-y-3 text-xs">
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { id: 'electrical', label: '⚡ Electrical' },
+                                { id: 'plumbing', label: '🚰 Plumbing' },
+                                { id: 'wifi', label: '📶 Wi-Fi / IT' },
+                                { id: 'carpentry', label: '🪑 Carpentry' },
+                                { id: 'ac', label: '❄️ AC / HVAC' },
+                                { id: 'cleaning', label: '🧹 Housekeeping' },
+                              ].map((cat) => (
+                                <button
+                                  type="button"
+                                  key={cat.id}
+                                  onClick={() => setComplaintCategory(cat.id as ComplaintCategory)}
+                                  className={`py-2 px-1 text-center rounded border cursor-pointer ${complaintCategory === cat.id
+                                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold'
+                                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                  {cat.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Issue Summary</label>
+                            <input
+                              type="text"
+                              required
+                              value={complaintTitle}
+                              onChange={(e) => setComplaintTitle(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                              placeholder="e.g. Broken switch socket, leaking washroom tap"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Detailed Description</label>
+                            <textarea
+                              rows={3}
+                              value={complaintDesc}
+                              onChange={(e) => setComplaintDesc(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                              placeholder="Provide specific details so the Hostel Warden can assess priority and assign the duty technician with proper parts..."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Urgency / Severity Level</label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {[
+                                { id: 'low', label: 'Low', sub: 'Non-urgent' },
+                                { id: 'medium', label: 'Medium', sub: 'Normal SLA' },
+                                { id: 'high', label: 'High', sub: 'Urgent' },
+                                { id: 'critical', label: 'Critical', sub: 'Hazard / Safety' },
+                              ].map((p) => (
+                                <button
+                                  type="button"
+                                  key={p.id}
+                                  onClick={() => setComplaintPriority(p.id as ComplaintPriority)}
+                                  className={`py-1.5 px-1 text-center rounded border cursor-pointer transition-colors ${complaintPriority === p.id
+                                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                >
+                                  <div className="font-bold">{p.label}</div>
+                                  <div className="text-3xs text-slate-400">{p.sub}</div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded text-amber-900 text-2xs space-y-1">
+                            <div className="flex items-center justify-between font-semibold text-amber-800">
+                              <span>Location: Room {deliveryRoom} · {deliveryHostel}</span>
+                              <span className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-mono text-3xs font-bold">
+                                Protocol: Warden Review
+                              </span>
+                            </div>
+                            <p className="text-3xs text-amber-700">
+                              Complaints are registered with the <strong>Hostel Warden</strong>. The Warden reviews the requisition and assigns the duty technician with priority directives.
+                            </p>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowComplaintModal(false)}
+                              className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded cursor-pointer transition-colors shadow-xs"
+                            >
+                              Register Issue with Warden
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: REQUEST GATE PASS */}
-      {showPassModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900">Request Digital Gate Pass</h3>
-              <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
-                ✕
-              </button>
-            </div>
-
-            {passSuccessMessage ? (
-              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
-                {passSuccessMessage}
-              </div>
-            ) : (
-              <form onSubmit={handleCreatePass} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Pass Category</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'late_night', label: 'Late Night' },
-                      { id: 'weekend_leave', label: 'Weekend Leave' },
-                      { id: 'day', label: 'Day Pass' },
-                    ].map((t) => (
-                      <button
-                        type="button"
-                        key={t.id}
-                        onClick={() => setPassType(t.id as PassType)}
-                        className={`py-2 text-center rounded border cursor-pointer ${
-                          passType === t.id
-                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-bold'
-                            : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Destination</label>
-                  <input
-                    type="text"
-                    required
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    placeholder="e.g. Central City Library, Pune Hometown, etc."
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Purpose of Visit</label>
-                  <input
-                    type="text"
-                    required
-                    value={purpose}
-                    onChange={(e) => setPurpose(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    placeholder="Brief description for security records"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Out Time</label>
-                    <input
-                      type="text"
-                      value={outTime}
-                      onChange={(e) => setOutTime(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Expected In Time</label>
-                    <input
-                      type="text"
-                      value={expectedInTime}
-                      onChange={(e) => setExpectedInTime(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Parent Phone (SMS Verification)</label>
-                  <input
-                    type="text"
-                    value={parentPhone}
-                    onChange={(e) => setParentPhone(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md font-mono"
-                  />
-                  <span className="text-3xs text-slate-400 mt-0.5 block">
-                    Automated SMS consent link will be dispatched immediately.
-                  </span>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowPassModal(false)}
-                    className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded shadow-xs"
-                  >
-                    Submit Gate Pass
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: LOG MAINTENANCE COMPLAINT */}
-      {showComplaintModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Register Maintenance Requisition</h3>
-                <p className="text-2xs text-slate-500">Submitted directly to Hostel Warden Desk. The Warden will assign the duty technician.</p>
-              </div>
-              <button onClick={() => setShowComplaintModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
-                ✕
-              </button>
-            </div>
-
-            {complaintSuccess ? (
-              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
-                {complaintSuccess}
-              </div>
-            ) : (
-              <form onSubmit={handleCreateComplaint} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'electrical', label: '⚡ Electrical' },
-                      { id: 'plumbing', label: '🚰 Plumbing' },
-                      { id: 'wifi', label: '📶 Wi-Fi / IT' },
-                      { id: 'carpentry', label: '🪑 Carpentry' },
-                      { id: 'ac', label: '❄️ AC / HVAC' },
-                      { id: 'cleaning', label: '🧹 Housekeeping' },
-                    ].map((cat) => (
-                      <button
-                        type="button"
-                        key={cat.id}
-                        onClick={() => setComplaintCategory(cat.id as ComplaintCategory)}
-                        className={`py-2 px-1 text-center rounded border cursor-pointer ${
-                          complaintCategory === cat.id
-                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold'
-                            : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Issue Summary</label>
-                  <input
-                    type="text"
-                    required
-                    value={complaintTitle}
-                    onChange={(e) => setComplaintTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                    placeholder="e.g. Broken switch socket, leaking washroom tap"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Detailed Description</label>
-                  <textarea
-                    rows={3}
-                    value={complaintDesc}
-                    onChange={(e) => setComplaintDesc(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                    placeholder="Provide specific details so the Hostel Warden can assess priority and assign the duty technician with proper parts..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Urgency / Severity Level</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[
-                      { id: 'low', label: 'Low', sub: 'Non-urgent' },
-                      { id: 'medium', label: 'Medium', sub: 'Normal SLA' },
-                      { id: 'high', label: 'High', sub: 'Urgent' },
-                      { id: 'critical', label: 'Critical', sub: 'Hazard / Safety' },
-                    ].map((p) => (
-                      <button
-                        type="button"
-                        key={p.id}
-                        onClick={() => setComplaintPriority(p.id as ComplaintPriority)}
-                        className={`py-1.5 px-1 text-center rounded border cursor-pointer transition-colors ${
-                          complaintPriority === p.id
-                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
-                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="font-bold">{p.label}</div>
-                        <div className="text-3xs text-slate-400">{p.sub}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded text-amber-900 text-2xs space-y-1">
-                  <div className="flex items-center justify-between font-semibold text-amber-800">
-                    <span>Location: Room {deliveryRoom} · {deliveryHostel}</span>
-                    <span className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-mono text-3xs font-bold">
-                      Protocol: Warden Review
-                    </span>
-                  </div>
-                  <p className="text-3xs text-amber-700">
-                    Complaints are registered with the <strong>Hostel Warden</strong>. The Warden reviews the requisition and assigns the duty technician with priority directives.
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowComplaintModal(false)}
-                    className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded cursor-pointer transition-colors shadow-xs"
-                  >
-                    Register Issue with Warden
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+              );
 };

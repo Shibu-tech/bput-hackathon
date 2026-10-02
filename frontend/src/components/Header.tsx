@@ -159,10 +159,8 @@ export const Header: React.FC<HeaderProps> = ({
                 className="bg-transparent text-xs font-medium text-slate-800 pr-2 pl-1 py-0.5 focus:outline-none cursor-pointer"
               >
                 <option value="en">English</option>
+                <option value="or">ଓଡ଼ିଆ (Odia)</option>
                 <option value="hi">हिन्दी (Hindi)</option>
-                <option value="te">తెలుగు (Telugu)</option>
-                <option value="ta">தமிழ் (Tamil)</option>
-                <option value="mr">मराठी (Marathi)</option>
               </select>
             </div>
 

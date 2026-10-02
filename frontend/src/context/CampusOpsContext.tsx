@@ -29,6 +29,7 @@ import {
   initialBroadcasts,
 } from '../data/mockData';
 import { emergencySound } from '../utils/audioAlert';
+import { formatTaskTime, getCurrentFormattedTime } from '../utils/timeFormat';
 import { useAuth } from './AuthContext';
 
 interface CampusOpsContextType {
@@ -556,10 +557,34 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     : t.status === 'IN_PROGRESS'
                       ? 'in_progress'
                       : 'open',
-            createdAt: new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            createdAt: t.createdAt ? formatTaskTime(t.createdAt) : 'Just now',
             assignedTo: t.assignedTechId?.fullName || t.assignedTo,
             assignedTrade: t.category,
             assignedBy: t.assignedByName,
+            assignedAt: (() => {
+              const assignedHist = t.statusHistory?.find((h: any) => h.status === 'ASSIGNED');
+              if (assignedHist?.changedAt) {
+                return formatTaskTime(assignedHist.changedAt);
+              }
+              if (t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS' || t.status === 'RESOLVED') {
+                return t.updatedAt ? formatTaskTime(t.updatedAt) : undefined;
+              }
+              return undefined;
+            })(),
+            resolvedAt: t.resolvedAt
+              ? formatTaskTime(t.resolvedAt)
+              : (() => {
+                  const resolvedHist = t.statusHistory?.find((h: any) => h.status === 'RESOLVED');
+                  return resolvedHist?.changedAt ? formatTaskTime(resolvedHist.changedAt) : undefined;
+                })(),
+            rejectedAt: (() => {
+              const rejectedHist = t.statusHistory?.find((h: any) => h.status === 'REJECTED');
+              return rejectedHist?.changedAt
+                ? formatTaskTime(rejectedHist.changedAt)
+                : t.status === 'REJECTED' && t.updatedAt
+                  ? formatTaskTime(t.updatedAt)
+                  : undefined;
+            })(),
             wardenNotes: t.wardenNotes,
             resolutionNotes: t.resolutionNotes,
             rejectionReason: t.rejectionReason,
@@ -979,7 +1004,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   ): Complaint => {
     const newId = `tc-${Date.now()}`;
     const ticketNumber = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
 
     // Check if an existing deduplicated ticket exists for this category & block
     const matchingMaster = deduplicatedTickets.find(
@@ -1085,7 +1110,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     priority?: ComplaintPriority,
     assignedBy: string = 'Hostel Warden',
   ) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
@@ -1123,7 +1148,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const resolveComplaint = async (id: string, notes: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
@@ -1152,7 +1177,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const rejectComplaint = async (id: string, reason: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
@@ -1213,7 +1238,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const resolveDeduplicatedTicket = (masterId: string, notes: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     const target = deduplicatedTickets.find((d) => d.id === masterId);
     if (!target) return;
 
@@ -1238,7 +1263,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const rejectDeduplicatedTicket = (masterId: string, reason: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     const target = deduplicatedTickets.find((d) => d.id === masterId);
     if (!target) return;
 
@@ -1270,7 +1295,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Simulate Surge Outage (Demonstration helper for hackathon & client PRD)
   const simulateOutageSurge = () => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     const sampleRooms = ['402', '405', '409', '414', '418', '422'];
     const newMasterCode = `DT-WIFI-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -1582,8 +1607,8 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     setActiveEmergency(alert);
 
-    // Play loud 3-second ambulance siren even if muted!
-    emergencySound.playAmbulanceSiren(3);
+    // Play loud 6-second ambulance siren even if muted!
+    emergencySound.playAmbulanceSiren(6);
   };
 
   const dismissEmergencyAlert = () => {

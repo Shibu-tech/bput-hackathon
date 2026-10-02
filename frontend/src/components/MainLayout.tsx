@@ -21,14 +21,20 @@ import {
 
 import { useCampusOps } from '../context/CampusOpsContext';
 import { useAuth } from '../context/AuthContext';
+import { useAutoTranslate } from '../utils/autoTranslate';
+import { emergencySound } from '../utils/audioAlert';
 
 const MainLayout: React.FC = () => {
   const {
     role: campusRole,
     activeEmergency,
+    dismissEmergencyAlert,
     resetDemoData,
     lowDataMode,
+    language,
   } = useCampusOps();
+
+  useAutoTranslate(language);
 
   const {
     activeRole,
@@ -49,6 +55,7 @@ const MainLayout: React.FC = () => {
 
   return (
     <div
+      id="dashboard-root"
       className={`min-h-screen flex flex-col ${lowDataMode
           ? 'bg-amber-50/30'
           : 'bg-slate-50'
@@ -88,14 +95,26 @@ const MainLayout: React.FC = () => {
             </span>
           </div>
 
-          <button
-            onClick={() =>
-              setIsEmergencyModalOpen(true)
-            }
-            className="px-3 py-1 bg-white text-red-700 hover:bg-red-50 text-xs font-bold rounded cursor-pointer shrink-0 transition-colors"
-          >
-            Open Emergency HUD
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() =>
+                setIsEmergencyModalOpen(true)
+              }
+              className="px-3 py-1 bg-white text-red-700 hover:bg-red-50 text-xs font-bold rounded cursor-pointer shrink-0 transition-colors"
+            >
+              Open Emergency HUD
+            </button>
+            <button
+              onClick={() => {
+                emergencySound.stop();
+                dismissEmergencyAlert();
+              }}
+              title="Turn off emergency alert across campus"
+              className="px-3 py-1 bg-red-950 hover:bg-black text-white text-xs font-bold rounded cursor-pointer shrink-0 transition-colors border border-red-400"
+            >
+              Turn Off Alert
+            </button>
+          </div>
         </div>
       )}
 
