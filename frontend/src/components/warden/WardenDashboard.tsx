@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { useAuth } from '../../context/AuthContext';
 import { translations } from '../../utils/translations';
-import { ComplaintCategory, ComplaintPriority, Complaint } from '../../types';
+import { ComplaintCategory, ComplaintPriority, Complaint, isHostelComplaint } from '../../types';
 import { dutyTechniciansList } from '../../data/mockData';
 import {
   ShieldCheck,
@@ -56,6 +56,9 @@ export const WardenDashboard: React.FC = () => {
   } = useCampusOps();
 
   const t = translations[language];
+
+  // Strictly filter for Hostel Maintenance complaints on the Warden Dashboard
+  const hostelComplaints = useMemo(() => complaints.filter(isHostelComplaint), [complaints]);
 
   // Warden active tab
   const [activeTab, setActiveTab] = useState<'rollcall' | 'approvals' | 'workload' | 'analytics' | 'broadcast'>('rollcall');
@@ -259,7 +262,7 @@ export const WardenDashboard: React.FC = () => {
         {[
           { id: 'rollcall', label: '10:30 PM Night Roll Call', count: overdueCount > 0 ? overdueCount : undefined },
           { id: 'approvals', label: 'Pending Leave Passes', count: pendingPasses.length },
-          { id: 'workload', label: 'Task Dispatch & Review Desk', count: complaints.filter(c => c.status === 'open' || c.status === 'rejected').length || undefined },
+          { id: 'workload', label: 'Task Dispatch & Review Desk', count: hostelComplaints.filter(c => c.status === 'open' || c.status === 'rejected').length || undefined },
           { id: 'analytics', label: 'Real-Time Trends & Analytics' },
           { id: 'broadcast', label: 'Targeted Circulars & WhatsApp Replacement' },
         ].map((tab) => (
@@ -493,21 +496,21 @@ export const WardenDashboard: React.FC = () => {
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
               <div className="text-2xs text-slate-500 font-semibold uppercase tracking-wider">Total Complaints</div>
               <div className="text-2xl font-bold font-mono text-slate-900 mt-1 tabular-nums">
-                {complaints.length}
+                {hostelComplaints.length}
               </div>
               <div className="text-2xs text-slate-400 mt-0.5">Across all campus blocks</div>
             </div>
 
             <div
               className={`border rounded-xl p-4 shadow-xs ${
-                complaints.filter((c) => c.status === 'open').length > 0
+                hostelComplaints.filter((c) => c.status === 'open').length > 0
                   ? 'bg-amber-50/50 border-amber-300'
                   : 'bg-white border-slate-200'
               }`}
             >
               <div className="text-2xs text-amber-700 font-semibold uppercase tracking-wider">Needs Dispatch</div>
               <div className="text-2xl font-bold font-mono text-amber-800 mt-1 tabular-nums">
-                {complaints.filter((c) => c.status === 'open').length}
+                {hostelComplaints.filter((c) => c.status === 'open').length}
               </div>
               <div className="text-2xs text-amber-600 mt-0.5">Awaiting Warden assignment</div>
             </div>
@@ -515,7 +518,7 @@ export const WardenDashboard: React.FC = () => {
             <div className="bg-white border border-blue-200 bg-blue-50/30 rounded-xl p-4 shadow-xs">
               <div className="text-2xs text-blue-700 font-semibold uppercase tracking-wider">With Duty Techs</div>
               <div className="text-2xl font-bold font-mono text-blue-800 mt-1 tabular-nums">
-                {complaints.filter((c) => c.status === 'assigned' || c.status === 'in_progress').length}
+                {hostelComplaints.filter((c) => c.status === 'assigned' || c.status === 'in_progress').length}
               </div>
               <div className="text-2xs text-blue-600 mt-0.5">In field repair progress</div>
             </div>
@@ -523,21 +526,21 @@ export const WardenDashboard: React.FC = () => {
             <div className="bg-white border border-emerald-200 bg-emerald-50/30 rounded-xl p-4 shadow-xs">
               <div className="text-2xs text-emerald-700 font-semibold uppercase tracking-wider">Resolved</div>
               <div className="text-2xl font-bold font-mono text-emerald-800 mt-1 tabular-nums">
-                {complaints.filter((c) => c.status === 'resolved').length}
+                {hostelComplaints.filter((c) => c.status === 'resolved').length}
               </div>
               <div className="text-2xs text-emerald-600 mt-0.5">With work documentation</div>
             </div>
 
             <div
               className={`border rounded-xl p-4 shadow-xs ${
-                complaints.filter((c) => c.status === 'rejected').length > 0
+                hostelComplaints.filter((c) => c.status === 'rejected').length > 0
                   ? 'bg-rose-50/50 border-rose-300'
                   : 'bg-white border-slate-200'
               }`}
             >
               <div className="text-2xs text-rose-700 font-semibold uppercase tracking-wider">Rejected / Flagged</div>
               <div className="text-2xl font-bold font-mono text-rose-800 mt-1 tabular-nums">
-                {complaints.filter((c) => c.status === 'rejected').length}
+                {hostelComplaints.filter((c) => c.status === 'rejected').length}
               </div>
               <div className="text-2xs text-rose-600 mt-0.5">Awaiting Warden review</div>
             </div>
@@ -555,7 +558,7 @@ export const WardenDashboard: React.FC = () => {
                 <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Task Dispatch & Assignment</span>
                 <span className="text-2xs px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 font-mono">
-                  {complaints.filter((c) => c.status === 'open' || c.status === 'assigned').length}
+                  {hostelComplaints.filter((c) => c.status === 'open' || c.status === 'assigned').length}
                 </span>
               </button>
 
@@ -568,7 +571,7 @@ export const WardenDashboard: React.FC = () => {
                 <FileText className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Review Audit Log</span>
                 <span className="text-2xs px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
-                  {complaints.length}
+                  {hostelComplaints.length}
                 </span>
               </button>
 
@@ -611,13 +614,13 @@ export const WardenDashboard: React.FC = () => {
 
                   <div className="flex items-center gap-2">
                     <span className="text-2xs text-slate-500">
-                      <strong>{complaints.filter((c) => c.status === 'open').length}</strong> unassigned
+                      <strong>{hostelComplaints.filter((c) => c.status === 'open').length}</strong> unassigned
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {complaints
+                  {hostelComplaints
                     .filter((c) => c.status !== 'resolved')
                     .map((c) => {
                       const isUnassigned = c.status === 'open';
@@ -766,11 +769,11 @@ export const WardenDashboard: React.FC = () => {
                 <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
                   <span className="text-2xs uppercase tracking-wider text-slate-400 font-semibold mr-1">Status:</span>
                   {[
-                    { id: 'all', label: 'All', count: complaints.length },
-                    { id: 'open', label: 'Needs Dispatch', count: complaints.filter((c) => c.status === 'open').length },
-                    { id: 'assigned', label: 'In Progress', count: complaints.filter((c) => c.status === 'assigned' || c.status === 'in_progress').length },
-                    { id: 'resolved', label: 'Resolved', count: complaints.filter((c) => c.status === 'resolved').length },
-                    { id: 'rejected', label: 'Rejected', count: complaints.filter((c) => c.status === 'rejected').length },
+                    { id: 'all', label: 'All', count: hostelComplaints.length },
+                    { id: 'open', label: 'Needs Dispatch', count: hostelComplaints.filter((c) => c.status === 'open').length },
+                    { id: 'assigned', label: 'In Progress', count: hostelComplaints.filter((c) => c.status === 'assigned' || c.status === 'in_progress').length },
+                    { id: 'resolved', label: 'Resolved', count: hostelComplaints.filter((c) => c.status === 'resolved').length },
+                    { id: 'rejected', label: 'Rejected', count: hostelComplaints.filter((c) => c.status === 'rejected').length },
                   ].map((st) => (
                     <button
                       key={st.id}
@@ -806,7 +809,7 @@ export const WardenDashboard: React.FC = () => {
 
               {/* Review Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {complaints
+                {hostelComplaints
                   .filter((c) => {
                     const matchesCategory = taskCategoryFilter === 'all' || c.category === taskCategoryFilter;
                     const matchesStatus =
@@ -959,19 +962,19 @@ export const WardenDashboard: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {dutyTechniciansList.map((tech) => {
-                  const techOpen = complaints.filter(
+                  const techOpen = hostelComplaints.filter(
                     (c) =>
                       c.assignedTo?.toLowerCase().includes(tech.name.toLowerCase()) &&
                       c.status !== 'resolved' &&
                       c.status !== 'rejected',
                   ).length;
-                  const techResolved = complaints.filter(
+                  const techResolved = hostelComplaints.filter(
                     (c) =>
                       (c.resolvedBy?.toLowerCase().includes(tech.name.toLowerCase()) ||
                         c.assignedTo?.toLowerCase().includes(tech.name.toLowerCase())) &&
                       c.status === 'resolved',
                   ).length;
-                  const techRejected = complaints.filter(
+                  const techRejected = hostelComplaints.filter(
                     (c) =>
                       (c.rejectedBy?.toLowerCase().includes(tech.name.toLowerCase()) ||
                         c.assignedTo?.toLowerCase().includes(tech.name.toLowerCase())) &&

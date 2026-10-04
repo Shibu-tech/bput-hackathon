@@ -26,7 +26,7 @@ router.get(
 router.patch(
   '/:id/status',
   authenticate,
-  requireRole('TECHNICIAN', 'WARDEN'),
+  requireRole('TECHNICIAN', 'WARDEN', 'FACULTY', 'HOD', 'ADMIN'),
   ticketController.updateTicketStatus
 );
 

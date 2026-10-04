@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@media print {
+  body.printing-pass * {
+    visibility: hidden !important;
+  }
+  body.printing-pass #printable-permanent-pass,
+  body.printing-pass #printable-permanent-pass * {
+    visibility: visible !important;
+  }
+  body.printing-pass #printable-permanent-pass {
+    position: absolute !important;
+    left: 50% !important;
+    top: 20px !important;
+    transform: translateX(-50%) !important;
+    width: 440px !important;
+    max-width: 440px !important;
+    border: 2px solid #000 !important;
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+}

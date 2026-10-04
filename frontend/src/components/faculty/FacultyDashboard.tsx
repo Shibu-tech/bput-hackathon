@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { translations } from '../../utils/translations';
 import { Marksheet, StudyNote, StudentEnrolled, FacultyNoticeItem } from '../../types';
+import { HodComplaintsSection } from './HodComplaintsSection';
 import {
   BookOpen,
   User,
@@ -35,15 +36,41 @@ import {
   RefreshCw,
   Eye,
   SlidersHorizontal,
+  AlertOctagon,
+  ArrowRight,
 } from 'lucide-react';
 
 export const FacultyDashboard: React.FC = () => {
-  const { user, updateUserProfile } = useAuth();
-  const { language, lowDataMode } = useCampusOps();
+  const { user, backendRole, updateUserProfile } = useAuth();
+  const { language, lowDataMode, complaints } = useCampusOps();
   const t = translations[language];
 
+  // HOD persona check & toggle
+  const isHodRole =
+    backendRole === 'HOD' ||
+    user?.designation?.toLowerCase().includes('hod') ||
+    user?.designation?.toLowerCase().includes('head of department');
+
+  const [isHodMode, setIsHodMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sahaj_faculty_hod_mode');
+    if (saved !== null) return saved === 'true';
+    return Boolean(isHodRole);
+  });
+
+  const toggleHodMode = () => {
+    setIsHodMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('sahaj_faculty_hod_mode', String(next));
+      return next;
+    });
+  };
+
   // Active Main Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'notices' | 'attendance' | 'marks' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'notices' | 'attendance' | 'marks' | 'notes' | 'complaints'>('overview');
+
+  const openComplaintsCount = useMemo(() => {
+    return (complaints || []).filter((c) => c.status === 'open').length;
+  }, [complaints]);
 
   // Loading and feedback states
   const [loading, setLoading] = useState(false);
@@ -613,37 +640,75 @@ export const FacultyDashboard: React.FC = () => {
       {/* ========================================================================= */}
       {/* HERO BANNER & PERSONA STATS */}
       {/* ========================================================================= */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl p-6 sm:p-8 border border-indigo-900/40">
+      <div className={`relative overflow-hidden rounded-2xl text-white shadow-xl p-6 sm:p-8 border transition-all duration-300 ${
+        isHodMode
+          ? 'bg-gradient-to-r from-slate-950 via-purple-950 to-indigo-950 border-purple-800/50'
+          : 'bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-indigo-900/40'
+      }`}>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full text-2xs font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center gap-1.5 backdrop-blur-xs">
-                <GraduationCap className="w-3.5 h-3.5 text-indigo-400" />
-                Faculty Academic Portal
-              </span>
+              {isHodMode ? (
+                <span className="px-2.5 py-1 rounded-full text-2xs font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-400/30 flex items-center gap-1.5 backdrop-blur-xs">
+                  <Layers className="w-3.5 h-3.5 text-purple-400" />
+                  Head of Department (HOD) Portal
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full text-2xs font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center gap-1.5 backdrop-blur-xs">
+                  <GraduationCap className="w-3.5 h-3.5 text-indigo-400" />
+                  Faculty Academic Portal
+                </span>
+              )}
+
               <span className="px-2.5 py-1 rounded-full text-2xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                Verified Teaching Staff
+                {isHodMode ? 'Department Head Authority' : 'Verified Teaching Staff'}
               </span>
+
               {user?.employeeId && (
                 <span className="px-2.5 py-1 rounded-full text-2xs font-mono font-bold bg-slate-800/80 text-slate-300 border border-slate-700">
                   ID: {user.employeeId}
                 </span>
               )}
+
+              {/* Persona Switcher Toggle */}
+              <button
+                onClick={toggleHodMode}
+                title="Switch between Head of Department and Faculty Member views"
+                className="px-2.5 py-1 rounded-full text-2xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-1.5 cursor-pointer transition-colors backdrop-blur-xs ml-auto sm:ml-0"
+              >
+                <Layers className="w-3 h-3 text-purple-300" />
+                <span>{isHodMode ? 'View as Faculty' : 'Switch to HOD View'}</span>
+              </button>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              Prof. {user?.fullName || 'Faculty Member'}
+              Prof. {user?.fullName || 'Academic Officer'}
+              {isHodMode && (
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/40 text-purple-200">
+                  HOD
+                </span>
+              )}
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              {user?.designation || 'Assistant Professor'} · {user?.department || 'Computer Science & Engineering'}
+              {isHodMode
+                ? `${user?.designation?.includes('HOD') ? user.designation : 'Head of Department (HOD)'} · ${user?.department || 'Department of Computer Science & Engineering'}`
+                : `${user?.designation || 'Assistant Professor'} · ${user?.department || 'Computer Science & Engineering'}`}
               <span className="hidden sm:inline"> · Cabin: {user?.cabin || 'Academic Block B, Room 304'}</span>
             </p>
           </div>
 
           {/* Quick shortcuts / buttons */}
           <div className="flex flex-wrap md:flex-col sm:flex-row items-stretch gap-2.5 shrink-0">
+            <button
+              onClick={() => setActiveTab('complaints')}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md hover:shadow-purple-500/25 transition-all cursor-pointer ring-1 ring-purple-400/30"
+            >
+              <AlertOctagon className="w-4 h-4 text-purple-200" />
+              <span>Student Complaints ({openComplaintsCount})</span>
+            </button>
+
             <button
               onClick={() => setActiveTab('notices')}
               className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md hover:shadow-indigo-500/20 transition-all cursor-pointer"
@@ -659,20 +724,12 @@ export const FacultyDashboard: React.FC = () => {
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <span>Take Roll Call</span>
             </button>
-
-            <button
-              onClick={() => setActiveTab('notes')}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 backdrop-blur-sm transition-all cursor-pointer"
-            >
-              <Upload className="w-4 h-4 text-amber-400" />
-              <span>Upload Notes</span>
-            </button>
           </div>
         </div>
 
         {/* Ambient subtle glow background */}
-        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-12 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
       {/* ========================================================================= */}
@@ -708,7 +765,13 @@ export const FacultyDashboard: React.FC = () => {
       <div className="border-b border-slate-200 bg-white rounded-xl shadow-xs p-1.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
         {[
           { id: 'overview', label: 'Overview', icon: BarChart3 },
-          { id: 'profile', label: 'Faculty Profile', icon: User },
+          {
+            id: 'complaints',
+            label: isHodMode ? 'Student Grievances (HOD)' : 'Student Complaints',
+            icon: AlertOctagon,
+            badge: openComplaintsCount,
+          },
+          { id: 'profile', label: isHodMode ? 'HOD Profile' : 'Faculty Profile', icon: User },
           { id: 'notices', label: 'Notices & Circulars', icon: Bell, badge: notices.length },
           { id: 'attendance', label: 'Student Attendance', icon: CheckCircle2 },
           { id: 'marks', label: 'Upload Marks', icon: Award, badge: marksheets.length },
@@ -873,6 +936,45 @@ export const FacultyDashboard: React.FC = () => {
                   <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-2xs">
                     <span className="text-xs font-bold text-rose-600 block">Absent</span>
                     <span className="text-lg font-black text-rose-600">{attendanceStats.absent}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* HOD Student Complaints & Grievance Hub Card */}
+              <div className="bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/50 rounded-2xl border border-purple-200/90 p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-purple-600 text-white shadow-xs">
+                      <AlertOctagon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900">Student Grievances & Complaints Desk (HOD)</h2>
+                      <p className="text-2xs text-slate-500">Oversee student issues across department laboratories, Wi-Fi, and hostel facilities</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('complaints')}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100/70 hover:bg-purple-200/80 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                  >
+                    <span>Open Grievance Desk</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-white rounded-xl border border-purple-100 shadow-2xs">
+                    <span className="text-2xs font-semibold uppercase text-slate-400 block">Total Logged</span>
+                    <span className="text-lg font-black text-slate-900">{complaints.length}</span>
+                  </div>
+                  <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 shadow-2xs">
+                    <span className="text-2xs font-semibold uppercase text-amber-800 block">Needs Action</span>
+                    <span className="text-lg font-black text-amber-700">{openComplaintsCount}</span>
+                  </div>
+                  <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-2xs font-semibold uppercase text-emerald-800 block">Resolved</span>
+                    <span className="text-lg font-black text-emerald-700">
+                      {complaints.filter((c) => c.status === 'resolved').length}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2096,6 +2198,19 @@ export const FacultyDashboard: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 7: HOD STUDENT COMPLAINTS & GRIEVANCES DESK */}
+      {/* ========================================================================= */}
+      {activeTab === 'complaints' && (
+        <HodComplaintsSection
+          onBroadcastNotice={(complaint) => {
+            setNoticeTitle(`Notice: Update regarding ${complaint.category.toUpperCase()} issue (${complaint.ticketNumber})`);
+            setNoticeBody(`Regarding student complaint ${complaint.ticketNumber} ("${complaint.title}") in ${complaint.hostelBlock}: The department administration and maintenance engineers are addressing this issue on-site.`);
+            setActiveTab('notices');
+          }}
+        />
       )}
     </div>
   );

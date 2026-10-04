@@ -29,7 +29,7 @@ export interface GatePass {
   actualInTime?: string;
   clearedAt?: string | number;
   status: PassStatus;
-  parentConsentVerified: boolean;
+  parentConsentVerified?: boolean;
   parentPhone: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -38,13 +38,30 @@ export interface GatePass {
   permanentQrCode?: string;
 }
 
-export type ComplaintCategory = 'electrical' | 'plumbing' | 'wifi' | 'carpentry' | 'cleaning' | 'ac';
+export type ComplaintDomain = 'academic' | 'hostel';
+
+export type ComplaintCategory =
+  | 'electrical'
+  | 'plumbing'
+  | 'wifi'
+  | 'carpentry'
+  | 'cleaning'
+  | 'ac'
+  | 'academic_lab'
+  | 'academic_exam'
+  | 'academic_faculty'
+  | 'academic_notes'
+  | 'academic_attendance'
+  | 'academic_library';
+
 export type ComplaintPriority = 'low' | 'medium' | 'high' | 'critical';
 export type ComplaintStatus = 'open' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
 
 export interface Complaint {
   id: string;
   ticketNumber: string;
+  domain?: ComplaintDomain;
+  department?: string;
   category: ComplaintCategory;
   title: string;
   description: string;
@@ -70,6 +87,24 @@ export interface Complaint {
   masterTicketId?: string; // If grouped into deduplicated issue
   upvotes: number;
 }
+
+export const isAcademicComplaint = (c: Complaint): boolean => {
+  if (c.domain === 'academic') return true;
+  if (c.domain === 'hostel') return false;
+  if (
+    c.category?.startsWith('academic_') ||
+    c.ticketNumber?.startsWith('ACAD-') ||
+    (c.hostelBlock && c.hostelBlock.toLowerCase().includes('academic')) ||
+    (c.roomNumber && (c.roomNumber.toLowerCase().includes('lab') || c.roomNumber.toLowerCase().includes('hall') || c.roomNumber.toLowerCase().includes('classroom')))
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const isHostelComplaint = (c: Complaint): boolean => {
+  return !isAcademicComplaint(c);
+};
 
 export interface DeduplicatedTicket {
   id: string;

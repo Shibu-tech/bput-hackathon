@@ -216,7 +216,14 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         const parsed: Complaint[] = JSON.parse(saved);
         const filtered = parsed.filter((c) => !isMockPerson(c));
-        if (filtered.length > 0) return filtered;
+        if (filtered.length > 0) {
+          const hasAcademic = filtered.some((c) => c.domain === 'academic' || c.category?.startsWith('academic_'));
+          if (!hasAcademic) {
+            const initialAcademic = initialComplaints.filter((c) => c.domain === 'academic');
+            return [...filtered, ...initialAcademic];
+          }
+          return filtered;
+        }
       } catch {
         return initialComplaints;
       }
@@ -1221,10 +1228,22 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       );
     }
 
+    const isAcademic =
+      data.domain === 'academic' ||
+      data.category?.startsWith('academic_') ||
+      (data.hostelBlock && data.hostelBlock.toLowerCase().includes('academic')) ||
+      (data.roomNumber && (data.roomNumber.toLowerCase().includes('lab') || data.roomNumber.toLowerCase().includes('hall') || data.roomNumber.toLowerCase().includes('classroom')));
+
+    const finalDomain: 'academic' | 'hostel' = data.domain || (isAcademic ? 'academic' : 'hostel');
+    const finalTicketNumber = isAcademic
+      ? `ACAD-${Math.floor(1000 + Math.random() * 9000)}`
+      : `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newTicket: Complaint = {
       ...data,
+      domain: finalDomain,
       id: newId,
-      ticketNumber,
+      ticketNumber: finalTicketNumber,
       status: 'open',
       createdAt: timeStr,
       upvotes: 1,
@@ -1887,6 +1906,20 @@ function getTradeName(cat: ComplaintCategory): string {
       return 'Housekeeping';
     case 'ac':
       return 'HVAC / Cooling';
+    case 'academic_lab':
+      return 'Lab & Workstations';
+    case 'academic_exam':
+      return 'Exam & Marks Evaluation';
+    case 'academic_faculty':
+      return 'Academic Curriculum';
+    case 'academic_notes':
+      return 'Course Materials';
+    case 'academic_attendance':
+      return 'Academic Attendance';
+    case 'academic_library':
+      return 'Library & Computing';
+    default:
+      return 'General Department';
   }
 }
 
@@ -1904,5 +1937,19 @@ function getTechnicianForCategory(cat: ComplaintCategory): string {
       return 'Radha Bai (Sanitation Supervisor)';
     case 'ac':
       return 'Manoj Verma (HVAC Tech)';
+    case 'academic_lab':
+      return 'Systems Lab Administrator';
+    case 'academic_exam':
+      return 'Controller of Examinations Rep';
+    case 'academic_faculty':
+      return 'Department Faculty Advisor';
+    case 'academic_notes':
+      return 'Course Coordinator';
+    case 'academic_attendance':
+      return 'Academic Registrar Staff';
+    case 'academic_library':
+      return 'Digital Library Coordinator';
+    default:
+      return 'Department Staff';
   }
 }

@@ -7,7 +7,7 @@ import {
   Briefcase,
   Layers,
   Calculator,
-  FileCheck2,
+  Monitor,
   Building2,
   UtensilsCrossed,
   Wrench,
@@ -77,15 +77,15 @@ const STAFF_ROLES: StaffRoleOption[] = [
     borderHover: 'hover:border-emerald-400 hover:shadow-emerald-100',
   },
   {
-    id: 'examination',
-    roleKey: 'EXAM_CELL',
-    title: 'Examination Cell',
-    subtitle: 'Exams controller, marks recording & grading superintendent',
-    defaultDesignation: 'Controller of Examinations / Superintendent',
-    icon: FileCheck2,
-    color: 'text-blue-600',
-    bgLight: 'bg-blue-50/70',
-    borderHover: 'hover:border-blue-400 hover:shadow-blue-100',
+    id: 'kiosk',
+    roleKey: 'KIOSK',
+    title: 'Self-Service Kiosk / Help Desk',
+    subtitle: 'Campus terminal & help desk for students without smartphones to access portal services',
+    defaultDesignation: 'Kiosk & Student Help Desk Administrator',
+    icon: Monitor,
+    color: 'text-sky-600',
+    bgLight: 'bg-sky-50/70',
+    borderHover: 'hover:border-sky-400 hover:shadow-sky-100',
   },
   {
     id: 'warden',
@@ -386,12 +386,13 @@ const Register: React.FC = () => {
             <div className="space-y-0.5">
               <span className="font-bold">Are you a Student?</span>
               <p className="text-amber-800 text-[11.5px] leading-relaxed">
-                Student accounts cannot register here. Your unique portal credentials and roll numbers are provisioned
-                automatically by the University Registrar upon admission.{' '}
+                Student accounts cannot register here. Your credentials and roll numbers are provisioned
+                automatically upon admission.{' '}
                 <Link to="/login" className="font-bold text-amber-900 underline hover:text-amber-950">
                   Log in directly here
                 </Link>
-                .
+                . Students without smartphones can access portal services and print slips at any{' '}
+                <strong className="font-semibold text-amber-950">Self-Service Kiosk / Help Desk</strong> terminal in campus lobbies.
               </p>
             </div>
           </div>

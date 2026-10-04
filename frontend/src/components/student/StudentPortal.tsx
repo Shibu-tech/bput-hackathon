@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { useAuth } from '../../context/AuthContext';
 import { translations } from '../../utils/translations';
-import { PassType, ComplaintCategory, ComplaintPriority, CafeteriaOrder, CafeteriaItem } from '../../types';
+import { PassType, ComplaintCategory, ComplaintPriority, CafeteriaOrder, CafeteriaItem, ComplaintDomain, isAcademicComplaint, isHostelComplaint } from '../../types';
 import {
   QrCode,
   DoorClosed,
@@ -83,11 +83,13 @@ export const StudentPortal: React.FC = () => {
 
   // Complaint Form State
   const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [complaintDomain, setComplaintDomain] = useState<ComplaintDomain>('hostel');
   const [complaintCategory, setComplaintCategory] = useState<ComplaintCategory>('electrical');
   const [complaintTitle, setComplaintTitle] = useState('');
   const [complaintDesc, setComplaintDesc] = useState('');
   const [complaintPriority, setComplaintPriority] = useState<ComplaintPriority>('medium');
   const [complaintSuccess, setComplaintSuccess] = useState('');
+  const [complaintDomainFilter, setComplaintDomainFilter] = useState<'all' | 'hostel' | 'academic'>('all');
 
   // Cafeteria Ordering State
   const [cart, setCart] = useState<{ [itemId: string]: number }>({});
@@ -226,18 +228,26 @@ export const StudentPortal: React.FC = () => {
     e.preventDefault();
     if (!complaintTitle.trim()) return;
 
+    const isAcad = complaintDomain === 'academic';
+
     createComplaint({
+      domain: complaintDomain,
       category: complaintCategory,
       title: complaintTitle,
-      description: complaintDesc || 'Direct complaint logged from hostel room.',
+      description: complaintDesc || (isAcad ? 'Academic issue logged via student portal.' : 'Direct complaint logged from hostel room.'),
       studentName: studentDisplayName,
       rollNumber: studentRoll,
-      roomNumber: user?.roomNumber || deliveryRoom || '101',
-      hostelBlock: user?.hostel || deliveryHostel || 'Hostel A',
+      roomNumber: isAcad ? (user?.department ? `${user.department} Dept` : 'Academic Block') : (user?.roomNumber || deliveryRoom || '101'),
+      hostelBlock: isAcad ? 'Academic Complex' : (user?.hostel || deliveryHostel || 'Hostel A'),
+      department: user?.department || 'CSE',
       priority: complaintPriority,
     });
 
-    setComplaintSuccess('Maintenance issue registered successfully! Forwarded to Hostel Warden for technician dispatch.');
+    setComplaintSuccess(
+      isAcad
+        ? 'Academic grievance registered successfully! Forwarded directly to the Head of Department (HOD) for review.'
+        : 'Maintenance issue registered successfully! Forwarded to Hostel Warden for technician dispatch.'
+    );
     setComplaintTitle('');
     setComplaintDesc('');
     setTimeout(() => {
@@ -396,7 +406,7 @@ export const StudentPortal: React.FC = () => {
           {[
             { id: 'passes', label: 'Gate Pass', icon: QrCode },
             { id: 'rooms', label: 'Room & Roommate', icon: DoorClosed },
-            { id: 'complaints', label: 'Maintenance', icon: Wrench },
+            { id: 'complaints', label: 'Complaints Section', icon: Wrench },
             { id: 'mess', label: 'Mess & Dining', icon: Utensils },
             { id: 'academics', label: 'Academics & Dues', icon: GraduationCap },
           ].map((tab) => {
@@ -407,8 +417,8 @@ export const StudentPortal: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${isActive
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -513,13 +523,12 @@ export const StudentPortal: React.FC = () => {
                     <span>Active Long Leave Pass</span>
                   </div>
                   <span
-                    className={`text-3xs font-bold px-2 py-0.5 rounded uppercase ${
-                      activePass.status === 'approved'
+                    className={`text-3xs font-bold px-2 py-0.5 rounded uppercase ${activePass.status === 'approved'
                         ? 'bg-emerald-100 text-emerald-800'
                         : activePass.status === 'checked_out'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-amber-200 text-amber-900'
-                    }`}
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-200 text-amber-900'
+                      }`}
                   >
                     {activePass.status === 'pending' ? 'Pending Warden Approval' : activePass.status}
                   </span>
@@ -574,11 +583,10 @@ export const StudentPortal: React.FC = () => {
                         </td>
                         <td className="py-3">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded text-2xs font-semibold ${
-                              isLongLeave
+                            className={`inline-block px-2 py-0.5 rounded text-2xs font-semibold ${isLongLeave
                                 ? 'bg-purple-100 text-purple-800'
                                 : 'bg-indigo-50 text-indigo-700'
-                            }`}
+                              }`}
                           >
                             {isLongLeave ? 'Long Leave' : 'Day Pass'}
                           </span>
@@ -600,14 +608,14 @@ export const StudentPortal: React.FC = () => {
                         <td className="py-3">
                           <span
                             className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${p.status === 'approved'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : p.status === 'checked_out'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : p.status === 'checked_out'
                                 ? 'bg-blue-50 text-blue-700'
                                 : p.status === 'completed'
-                                ? 'bg-slate-100 text-slate-700'
-                                : p.status === 'rejected'
-                                ? 'bg-red-50 text-red-700'
-                                : 'bg-amber-50 text-amber-700'
+                                  ? 'bg-slate-100 text-slate-700'
+                                  : p.status === 'rejected'
+                                    ? 'bg-red-50 text-red-700'
+                                    : 'bg-amber-50 text-amber-700'
                               }`}
                           >
                             {p.status.replace('_', ' ')}
@@ -656,8 +664,8 @@ export const StudentPortal: React.FC = () => {
                   <div
                     key={room.id}
                     className={`border rounded-xl p-4 transition-all ${isSelected
-                        ? 'border-indigo-600 ring-2 ring-indigo-50 bg-indigo-50/10'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
+                      ? 'border-indigo-600 ring-2 ring-indigo-50 bg-indigo-50/10'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                   >
                     <div className="flex items-center justify-between">
@@ -685,10 +693,10 @@ export const StudentPortal: React.FC = () => {
                         <div
                           key={bed.id}
                           className={`p-2.5 rounded-lg border text-xs ${bed.isOccupied
-                              ? 'bg-slate-50 border-slate-200 text-slate-600'
-                              : isSelected && selectedBedLabel === bed.bedLabel
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-emerald-50/60 border-emerald-200 text-emerald-900 hover:border-emerald-400 cursor-pointer'
+                            ? 'bg-slate-50 border-slate-200 text-slate-600'
+                            : isSelected && selectedBedLabel === bed.bedLabel
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-emerald-50/60 border-emerald-200 text-emerald-900 hover:border-emerald-400 cursor-pointer'
                             }`}
                           onClick={() => {
                             if (!bed.isOccupied) {
@@ -758,123 +766,171 @@ export const StudentPortal: React.FC = () => {
       {activeTab === 'complaints' && (
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  Hostel Maintenance & Room Repair Requisitions
+                  Campus Requisitions & Grievance Redressal
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Register issues directly with the Warden Desk. The Hostel Warden assesses urgency and dispatches the duty technician with priority directives.
+                  Hostel maintenance issues route to the <strong>Hostel Warden</strong>. Academic concerns route directly to your <strong>Head of Department (HOD)</strong>.
                 </p>
               </div>
               <button
-                onClick={() => setShowComplaintModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer transition-colors"
+                onClick={() => {
+                  setComplaintDomain('hostel');
+                  setComplaintCategory('electrical');
+                  setShowComplaintModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Log Maintenance Issue
+                Log Grievance / Requisition
               </button>
+            </div>
+
+            {/* Filter Pills: All vs Hostel (Warden) vs Academic (HOD) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-2xs uppercase tracking-wider text-slate-400 font-semibold mr-1">Filter Desk:</span>
+              {[
+                { id: 'all', label: 'All Requests', count: complaints.length },
+                { id: 'hostel', label: '🏠 Hostel Maintenance (Warden)', count: complaints.filter(isHostelComplaint).length },
+                { id: 'academic', label: '🎓 Academic Grievances (HOD)', count: complaints.filter(isAcademicComplaint).length },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setComplaintDomainFilter(f.id as any)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors whitespace-nowrap ${complaintDomainFilter === f.id
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                  {f.label} ({f.count})
+                </button>
+              ))}
             </div>
 
             {/* Complaints List */}
             <div className="space-y-3">
-              {complaints.map((c) => {
-                const isMine = c.rollNumber === studentRoll;
-                return (
-                  <div
-                    key={c.id}
-                    className={`border rounded-xl p-4 transition-all ${isMine ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200 bg-white'
-                      }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-slate-900">{c.ticketNumber}</span>
-                        <span className="text-xs uppercase font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                          {c.category}
-                        </span>
-                        {c.masterTicketId && (
-                          <span className="text-2xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-purple-500" />
-                            Grouped with Wing Outage
+              {complaints
+                .filter((c) => {
+                  if (complaintDomainFilter === 'hostel') return isHostelComplaint(c);
+                  if (complaintDomainFilter === 'academic') return isAcademicComplaint(c);
+                  return true;
+                })
+                .map((c) => {
+                  const isMine = c.rollNumber === studentRoll;
+                  const isAcad = isAcademicComplaint(c);
+                  return (
+                    <div
+                      key={c.id}
+                      className={`border rounded-xl p-4 transition-all ${isMine ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200 bg-white'
+                        }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-slate-900">{c.ticketNumber}</span>
+                          <span
+                            className={`text-2xs uppercase font-bold px-2 py-0.5 rounded border ${isAcad
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}
+                          >
+                            {isAcad ? '🎓 HOD Academic' : '🏠 Warden Hostel'}
                           </span>
+                          <span className="text-xs uppercase font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                            {c.category.replace('academic_', '')}
+                          </span>
+                          {c.masterTicketId && (
+                            <span className="text-2xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-purple-500" />
+                              Grouped with Wing Outage
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${c.status === 'resolved'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : c.status === 'in_progress'
+                                  ? 'bg-blue-50 text-blue-700'
+                                  : c.status === 'rejected'
+                                    ? 'bg-rose-50 text-rose-700 font-bold'
+                                    : c.status === 'assigned'
+                                      ? 'bg-indigo-50 text-indigo-700'
+                                      : 'bg-amber-50 text-amber-700 font-semibold'
+                              }`}
+                          >
+                            {c.status === 'open'
+                              ? isAcad
+                                ? 'Awaiting HOD Review'
+                                : 'Awaiting Warden Dispatch'
+                              : c.status === 'assigned'
+                                ? isAcad
+                                  ? 'Faculty/Staff Action'
+                                  : 'Technician Dispatched'
+                                : c.status.replace('_', ' ')}
+                          </span>
+                          <button
+                            onClick={() => upvoteComplaint(c.id)}
+                            title="I also experience this problem"
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded border border-slate-200 cursor-pointer transition-colors"
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                            <span className="font-mono tabular-nums text-xs">{c.upvotes}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <h3 className="text-sm font-semibold text-slate-900 mt-2">{c.title}</h3>
+                      <p className="text-xs text-slate-600 mt-1">{c.description}</p>
+
+                      <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 text-2xs text-slate-500">
+                        <span>
+                          {isAcad
+                            ? `${c.department || 'CSE'} Dept · ${c.roomNumber || 'Academic Block'}`
+                            : `Room ${c.roomNumber} (${c.hostelBlock})`}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>Desk: <strong>{isAcad ? 'Head of Dept (HOD)' : 'Hostel Warden'}</strong></span>
+                        {c.assignedTo ? (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span>Assigned: <strong>{c.assignedTo}</strong></span>
+                            {c.assignedBy && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span>By: <strong>{c.assignedBy}</strong></span>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              {isAcad ? 'Pending HOD Decision' : 'Awaiting Warden Assignment'}
+                            </span>
+                          </>
+                        )}
+                        {c.wardenNotes && (
+                          <div className="w-full text-indigo-700 bg-indigo-50 p-2 rounded mt-1 border border-indigo-100">
+                            <strong>{isAcad ? 'HOD Remarks:' : 'Warden Directive:'}</strong> {c.wardenNotes}
+                          </div>
+                        )}
+                        {c.resolutionNotes && (
+                          <div className="w-full text-emerald-700 font-medium bg-emerald-50 p-2 rounded mt-1 border border-emerald-100">
+                            <strong>Resolution:</strong> {c.resolutionNotes}
+                          </div>
+                        )}
+                        {c.status === 'rejected' && c.rejectionReason && (
+                          <div className="w-full text-rose-700 font-medium bg-rose-50 p-2 rounded mt-1 border border-rose-200">
+                            <strong>Rejection Note:</strong> {c.rejectionReason}
+                          </div>
                         )}
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${c.status === 'resolved'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : c.status === 'in_progress'
-                                ? 'bg-blue-50 text-blue-700'
-                                : c.status === 'rejected'
-                                  ? 'bg-rose-50 text-rose-700 font-bold'
-                                  : c.status === 'assigned'
-                                    ? 'bg-indigo-50 text-indigo-700'
-                                    : 'bg-amber-50 text-amber-700 font-semibold'
-                            }`}
-                        >
-                          {c.status === 'open'
-                            ? 'Awaiting Warden Dispatch'
-                            : c.status === 'assigned'
-                              ? 'Technician Dispatched'
-                              : c.status.replace('_', ' ')}
-                        </span>
-                        <button
-                          onClick={() => upvoteComplaint(c.id)}
-                          title="I also experience this problem"
-                          className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded border border-slate-200 cursor-pointer transition-colors"
-                        >
-                          <ThumbsUp className="w-3 h-3" />
-                          <span className="font-mono tabular-nums text-xs">{c.upvotes}</span>
-                        </button>
-                      </div>
                     </div>
-
-                    <h3 className="text-sm font-semibold text-slate-900 mt-2">{c.title}</h3>
-                    <p className="text-xs text-slate-600 mt-1">{c.description}</p>
-
-                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 text-2xs text-slate-500">
-                      <span>Room {c.roomNumber} ({c.hostelBlock})</span>
-                      <span aria-hidden="true">·</span>
-                      <span>Trade Category: <strong>{c.assignedTrade || c.category}</strong></span>
-                      {c.assignedTo ? (
-                        <>
-                          <span aria-hidden="true">·</span>
-                          <span>Duty Technician: <strong>{c.assignedTo}</strong></span>
-                          {c.assignedBy && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span>Dispatched by: <strong>{c.assignedBy}</strong></span>
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <span aria-hidden="true">·</span>
-                          <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                            Awaiting Warden Assignment
-                          </span>
-                        </>
-                      )}
-                      {c.wardenNotes && (
-                        <div className="w-full text-indigo-700 bg-indigo-50 p-2 rounded mt-1 border border-indigo-100">
-                          <strong>Warden Directive:</strong> {c.wardenNotes}
-                        </div>
-                      )}
-                      {c.resolutionNotes && (
-                        <div className="w-full text-emerald-700 font-medium bg-emerald-50 p-2 rounded mt-1 border border-emerald-100">
-                          <strong>Resolution:</strong> {c.resolutionNotes}
-                        </div>
-                      )}
-                      {c.status === 'rejected' && c.rejectionReason && (
-                        <div className="w-full text-rose-700 font-medium bg-rose-50 p-2 rounded mt-1 border border-rose-200">
-                          <strong>Technician Flag / Reason:</strong> "{c.rejectionReason}" (Under Warden Review)
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
@@ -1086,8 +1142,8 @@ export const StudentPortal: React.FC = () => {
                   <div
                     key={food.id}
                     className={`border rounded-lg p-3 space-y-2 transition-all ${isOutOfStock
-                        ? 'border-slate-200 bg-slate-50/80 opacity-80'
-                        : 'border-slate-200 rounded-lg bg-white shadow-2xs hover:border-slate-300'
+                      ? 'border-slate-200 bg-slate-50/80 opacity-80'
+                      : 'border-slate-200 rounded-lg bg-white shadow-2xs hover:border-slate-300'
                       }`}
                   >
                     <div className="flex items-center justify-between text-2xs text-slate-500">
@@ -1170,14 +1226,14 @@ export const StudentPortal: React.FC = () => {
                             <span className="font-mono font-bold text-slate-900 text-xs">{o.orderNumber}</span>
                             <span
                               className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded border ${o.status === 'cancelled'
-                                  ? 'bg-rose-100 text-rose-800 border-rose-200'
-                                  : o.status === 'delivered'
-                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                    : o.status === 'out_for_delivery'
-                                      ? 'bg-purple-100 text-purple-800 border-purple-200'
-                                      : o.status === 'preparing'
-                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
-                                        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                : o.status === 'delivered'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  : o.status === 'out_for_delivery'
+                                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                    : o.status === 'preparing'
+                                      ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                      : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                                 }`}
                             >
                               {o.status.replace('_', ' ')}
@@ -1291,8 +1347,8 @@ export const StudentPortal: React.FC = () => {
                                       >
                                         <Star
                                           className={`w-5 h-5 ${star <= reviewRating
-                                              ? 'fill-amber-400 text-amber-400 drop-shadow-xs'
-                                              : 'text-slate-300 hover:text-amber-300'
+                                            ? 'fill-amber-400 text-amber-400 drop-shadow-xs'
+                                            : 'text-slate-300 hover:text-amber-300'
                                             }`}
                                         />
                                       </button>
@@ -1434,8 +1490,8 @@ export const StudentPortal: React.FC = () => {
               <button
                 onClick={() => setAcademicSubTab('marks')}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'marks'
-                    ? 'bg-white text-indigo-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
@@ -1445,8 +1501,8 @@ export const StudentPortal: React.FC = () => {
               <button
                 onClick={() => setAcademicSubTab('certificates')}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'certificates'
-                    ? 'bg-white text-emerald-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <Award className="w-3.5 h-3.5 text-emerald-600" />
@@ -1456,8 +1512,8 @@ export const StudentPortal: React.FC = () => {
               <button
                 onClick={() => setAcademicSubTab('notes')}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'notes'
-                    ? 'bg-white text-purple-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-purple-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <FileText className="w-3.5 h-3.5 text-purple-600" />
@@ -1467,8 +1523,8 @@ export const StudentPortal: React.FC = () => {
               <button
                 onClick={() => setAcademicSubTab('schedule')}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${academicSubTab === 'schedule'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
                 <Clock className="w-3.5 h-3.5 text-slate-600" />
@@ -1656,304 +1712,397 @@ export const StudentPortal: React.FC = () => {
         </div>
       )}
 
-                {/* MODAL: REQUEST GATE PASS */}
-                {showPassModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <h3 className="text-sm font-bold text-slate-900">Request Digital Gate Pass</h3>
-                        <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
-                          ✕
-                        </button>
-                      </div>
+      {/* MODAL: REQUEST GATE PASS */}
+      {showPassModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900">Request Digital Gate Pass</h3>
+              <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
+                ✕
+              </button>
+            </div>
 
-                      {passSuccessMessage ? (
-                        <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
-                          {passSuccessMessage}
-                        </div>
-                      ) : (
-                        <form onSubmit={handleCreatePass} className="space-y-3 text-xs">
-                          <div>
-                            <label className="block font-semibold text-slate-700 mb-1.5">Pass Category</label>
-                            <div className="grid grid-cols-2 gap-2.5">
-                              {[
-                                {
-                                  id: 'day',
-                                  label: 'Day Pass',
-                                  badge: 'Auto-Approved',
-                                  desc: 'Daily outing (No Warden approval required)',
-                                },
-                                {
-                                  id: 'long_leave',
-                                  label: 'Long Leave',
-                                  badge: 'Warden Approval Needed',
-                                  desc: 'Multi-day leave (Sent to Warden for approval)',
-                                },
-                              ].map((t) => (
-                                <button
-                                  type="button"
-                                  key={t.id}
-                                  onClick={() => setPassType(t.id as PassType)}
-                                  className={`p-3 text-left rounded-lg border-2 cursor-pointer transition-all ${
-                                    passType === t.id
-                                      ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-xs'
-                                      : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-bold text-xs">{t.label}</span>
-                                    <span
-                                      className={`text-3xs font-semibold px-1.5 py-0.5 rounded ${
-                                        t.id === 'day'
-                                          ? 'bg-emerald-100 text-emerald-800'
-                                          : 'bg-amber-100 text-amber-800'
-                                      }`}
-                                    >
-                                      {t.badge}
-                                    </span>
-                                  </div>
-                                  <p className="text-3xs text-slate-500 leading-tight">{t.desc}</p>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {passType === 'day' && (
-                            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-2xs text-emerald-800">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                              <span>
-                                <strong>Institutional Day Pass:</strong> Auto-approved immediately by institutional policy. Does NOT go to the Warden for approval.
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Long Leave: Date of Leave & Date of Return boxes */}
-                          {(passType === 'long_leave' || passType === 'weekend_leave') && (
-                            <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-lg space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
-                                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                                  <span>Long Leave Travel Dates</span>
-                                </div>
-                                <span className="text-3xs font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
-                                  Sent to Warden for Approval
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block font-semibold text-slate-700 mb-1">
-                                    Date of Leave <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="date"
-                                    required
-                                    value={leaveDate}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => setLeaveDate(e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block font-semibold text-slate-700 mb-1">
-                                    Date of Return <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="date"
-                                    required
-                                    value={returnDate}
-                                    min={leaveDate || new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => setReturnDate(e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans text-xs"
-                                  />
-                                </div>
-                              </div>
-                              <p className="text-3xs text-indigo-700 font-medium">
-                                Only Long Leave requests are sent to the Hostel Warden for verification and approval.
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block font-semibold text-slate-700 mb-1">Out Time</label>
-                              <input
-                                type="text"
-                                value={outTime}
-                                onChange={(e) => setOutTime(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block font-semibold text-slate-700 mb-1">Expected In Time</label>
-                              <input
-                                type="text"
-                                value={expectedInTime}
-                                onChange={(e) => setExpectedInTime(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block font-semibold text-slate-700 mb-1">Parent Phone (SMS Verification)</label>
-                            <input
-                              type="text"
-                              value={parentPhone}
-                              onChange={(e) => setParentPhone(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-md font-mono"
-                            />
-                            <span className="text-3xs text-slate-400 mt-0.5 block">
-                              Automated SMS consent link will be dispatched immediately.
-                            </span>
-                          </div>
-
-                          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowPassModal(false)}
-                              className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded shadow-xs"
-                            >
-                              Submit Gate Pass
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* MODAL: LOG MAINTENANCE COMPLAINT */}
-                {showComplaintModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div>
-                          <h3 className="text-sm font-bold text-slate-900">Register Maintenance Requisition</h3>
-                          <p className="text-2xs text-slate-500">Submitted directly to Hostel Warden Desk. The Warden will assign the duty technician.</p>
-                        </div>
-                        <button onClick={() => setShowComplaintModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
-                          ✕
-                        </button>
-                      </div>
-
-                      {complaintSuccess ? (
-                        <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
-                          {complaintSuccess}
-                        </div>
-                      ) : (
-                        <form onSubmit={handleCreateComplaint} className="space-y-3 text-xs">
-                          <div>
-                            <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {[
-                                { id: 'electrical', label: '⚡ Electrical' },
-                                { id: 'plumbing', label: '🚰 Plumbing' },
-                                { id: 'wifi', label: '📶 Wi-Fi / IT' },
-                                { id: 'carpentry', label: '🪑 Carpentry' },
-                                { id: 'ac', label: '❄️ AC / HVAC' },
-                                { id: 'cleaning', label: '🧹 Housekeeping' },
-                              ].map((cat) => (
-                                <button
-                                  type="button"
-                                  key={cat.id}
-                                  onClick={() => setComplaintCategory(cat.id as ComplaintCategory)}
-                                  className={`py-2 px-1 text-center rounded border cursor-pointer ${complaintCategory === cat.id
-                                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold'
-                                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                                    }`}
-                                >
-                                  {cat.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block font-semibold text-slate-700 mb-1">Issue Summary</label>
-                            <input
-                              type="text"
-                              required
-                              value={complaintTitle}
-                              onChange={(e) => setComplaintTitle(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                              placeholder="e.g. Broken switch socket, leaking washroom tap"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block font-semibold text-slate-700 mb-1">Detailed Description</label>
-                            <textarea
-                              rows={3}
-                              value={complaintDesc}
-                              onChange={(e) => setComplaintDesc(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
-                              placeholder="Provide specific details so the Hostel Warden can assess priority and assign the duty technician with proper parts..."
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block font-semibold text-slate-700 mb-1">Urgency / Severity Level</label>
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {[
-                                { id: 'low', label: 'Low', sub: 'Non-urgent' },
-                                { id: 'medium', label: 'Medium', sub: 'Normal SLA' },
-                                { id: 'high', label: 'High', sub: 'Urgent' },
-                                { id: 'critical', label: 'Critical', sub: 'Hazard / Safety' },
-                              ].map((p) => (
-                                <button
-                                  type="button"
-                                  key={p.id}
-                                  onClick={() => setComplaintPriority(p.id as ComplaintPriority)}
-                                  className={`py-1.5 px-1 text-center rounded border cursor-pointer transition-colors ${complaintPriority === p.id
-                                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
-                                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                    }`}
-                                >
-                                  <div className="font-bold">{p.label}</div>
-                                  <div className="text-3xs text-slate-400">{p.sub}</div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded text-amber-900 text-2xs space-y-1">
-                            <div className="flex items-center justify-between font-semibold text-amber-800">
-                              <span>Location: Room {deliveryRoom} · {deliveryHostel}</span>
-                              <span className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-mono text-3xs font-bold">
-                                Protocol: Warden Review
-                              </span>
-                            </div>
-                            <p className="text-3xs text-amber-700">
-                              Complaints are registered with the <strong>Hostel Warden</strong>. The Warden reviews the requisition and assigns the duty technician with priority directives.
-                            </p>
-                          </div>
-
-                          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowComplaintModal(false)}
-                              className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded cursor-pointer transition-colors shadow-xs"
-                            >
-                              Register Issue with Warden
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-                )}
+            {passSuccessMessage ? (
+              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
+                {passSuccessMessage}
               </div>
-              );
+            ) : (
+              <form onSubmit={handleCreatePass} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Pass Category</label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {[
+                      {
+                        id: 'day',
+                        label: 'Day Pass',
+                        badge: 'Auto-Approved',
+                        desc: 'Daily outing (No Warden approval required)',
+                      },
+                      {
+                        id: 'long_leave',
+                        label: 'Long Leave',
+                        badge: 'Warden Approval Needed',
+                        desc: 'Multi-day leave (Sent to Warden for approval)',
+                      },
+                    ].map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        onClick={() => setPassType(t.id as PassType)}
+                        className={`p-3 text-left rounded-lg border-2 cursor-pointer transition-all ${passType === t.id
+                            ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-xs'
+                            : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
+                          }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs">{t.label}</span>
+                          <span
+                            className={`text-3xs font-semibold px-1.5 py-0.5 rounded ${t.id === 'day'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                              }`}
+                          >
+                            {t.badge}
+                          </span>
+                        </div>
+                        <p className="text-3xs text-slate-500 leading-tight">{t.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {passType === 'day' && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-2xs text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      <strong>Institutional Day Pass:</strong> Auto-approved immediately by institutional policy. Does NOT go to the Warden for approval.
+                    </span>
+                  </div>
+                )}
+
+                {/* Long Leave: Date of Leave & Date of Return boxes */}
+                {(passType === 'long_leave' || passType === 'weekend_leave') && (
+                  <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Long Leave Travel Dates</span>
+                      </div>
+                      <span className="text-3xs font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
+                        Sent to Warden for Approval
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Date of Leave <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={leaveDate}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setLeaveDate(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Date of Return <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={returnDate}
+                          min={leaveDate || new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans text-xs"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-3xs text-indigo-700 font-medium">
+                      Only Long Leave requests are sent to the Hostel Warden for verification and approval.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Out Time</label>
+                    <input
+                      type="text"
+                      value={outTime}
+                      onChange={(e) => setOutTime(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Expected In Time</label>
+                    <input
+                      type="text"
+                      value={expectedInTime}
+                      onChange={(e) => setExpectedInTime(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Parent Phone (SMS Verification)</label>
+                  <input
+                    type="text"
+                    value={parentPhone}
+                    onChange={(e) => setParentPhone(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md font-mono"
+                  />
+                  <span className="text-3xs text-slate-400 mt-0.5 block">
+                    Automated SMS consent link will be dispatched immediately.
+                  </span>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPassModal(false)}
+                    className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded shadow-xs"
+                  >
+                    Submit Gate Pass
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: LOG MAINTENANCE OR ACADEMIC COMPLAINT */}
+      {showComplaintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {complaintDomain === 'academic' ? 'Submit Academic Grievance' : 'Register Maintenance Requisition'}
+                </h3>
+                <p className="text-2xs text-slate-500">
+                  {complaintDomain === 'academic'
+                    ? 'Directly addressed to Head of Department (HOD) for academic redressal.'
+                    : 'Submitted directly to Hostel Warden Desk for technician dispatch.'}
+                </p>
+              </div>
+              <button onClick={() => setShowComplaintModal(false)} className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            {complaintSuccess ? (
+              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg text-center">
+                {complaintSuccess}
+              </div>
+            ) : (
+              <form onSubmit={handleCreateComplaint} className="space-y-3.5 text-xs">
+                {/* Domain Selector Tabs */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Requisition Target Desk</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setComplaintDomain('hostel');
+                        setComplaintCategory('electrical');
+                      }}
+                      className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${complaintDomain === 'hostel'
+                          ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 font-semibold shadow-xs ring-1 ring-indigo-500'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <span>🏠 Hostel Maintenance</span>
+                      </div>
+                      <div className="text-3xs text-slate-500 mt-0.5">Routes to Hostel Warden Desk</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setComplaintDomain('academic');
+                        setComplaintCategory('academic_lab');
+                      }}
+                      className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${complaintDomain === 'academic'
+                          ? 'border-emerald-600 bg-emerald-50/70 text-emerald-900 font-semibold shadow-xs ring-1 ring-emerald-500'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <span>🎓 Academic Grievance</span>
+                      </div>
+                      <div className="text-3xs text-slate-500 mt-0.5">Routes to Head of Dept (HOD)</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Category Selector */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {complaintDomain === 'academic' ? 'Academic Concern Category' : 'Trade Category'}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {complaintDomain === 'hostel'
+                      ? [
+                        { id: 'electrical', label: '⚡ Electrical' },
+                        { id: 'plumbing', label: '🚰 Plumbing' },
+                        { id: 'wifi', label: '📶 Wi-Fi / IT' },
+                        { id: 'carpentry', label: '🪑 Carpentry' },
+                        { id: 'ac', label: '❄️ AC / HVAC' },
+                        { id: 'cleaning', label: '🧹 Housekeeping' },
+                      ].map((cat) => (
+                        <button
+                          type="button"
+                          key={cat.id}
+                          onClick={() => setComplaintCategory(cat.id as ComplaintCategory)}
+                          className={`py-2 px-1 text-center rounded border cursor-pointer transition-colors ${complaintCategory === cat.id
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold'
+                              : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))
+                      : [
+                        { id: 'academic_lab', label: '🖥️ Lab Workstation' },
+                        { id: 'academic_exam', label: '📝 Exam & Marks' },
+                        { id: 'academic_faculty', label: '👨‍🏫 Timetable / Class' },
+                        { id: 'academic_notes', label: '📚 LMS & Notes' },
+                        { id: 'academic_attendance', label: '⏱️ Attendance' },
+                        { id: 'academic_library', label: '📖 Library Access' },
+                      ].map((cat) => (
+                        <button
+                          type="button"
+                          key={cat.id}
+                          onClick={() => setComplaintCategory(cat.id as ComplaintCategory)}
+                          className={`py-2 px-1 text-center rounded border cursor-pointer transition-colors ${complaintCategory === cat.id
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-semibold'
+                              : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Issue Summary</label>
+                  <input
+                    type="text"
+                    required
+                    value={complaintTitle}
+                    onChange={(e) => setComplaintTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                    placeholder={
+                      complaintDomain === 'academic'
+                        ? 'e.g. Lab 3 Workstation #14 GPU driver crash, Mid-term marks total mismatch'
+                        : 'e.g. Broken switch socket, leaking washroom tap'
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Detailed Description</label>
+                  <textarea
+                    rows={3}
+                    value={complaintDesc}
+                    onChange={(e) => setComplaintDesc(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none"
+                    placeholder={
+                      complaintDomain === 'academic'
+                        ? 'Provide specific details for the HOD (subject code, batch, professor in-charge, or specific lab desk)...'
+                        : 'Provide specific details so the Hostel Warden can assess priority and assign the duty technician with proper parts...'
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Urgency / Severity Level</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'low', label: 'Low', sub: 'Non-urgent' },
+                      { id: 'medium', label: 'Medium', sub: 'Standard' },
+                      { id: 'high', label: 'High', sub: 'Urgent' },
+                      { id: 'critical', label: 'Critical', sub: 'Urgent Action' },
+                    ].map((p) => (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onClick={() => setComplaintPriority(p.id as ComplaintPriority)}
+                        className={`py-1.5 px-1 text-center rounded border cursor-pointer transition-colors ${complaintPriority === p.id
+                            ? complaintDomain === 'academic'
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-semibold shadow-xs'
+                              : 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                      >
+                        <div className="font-bold">{p.label}</div>
+                        <div className="text-3xs text-slate-400">{p.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`p-2.5 rounded border text-2xs space-y-1 ${complaintDomain === 'academic'
+                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                    : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                  }`}>
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>
+                      {complaintDomain === 'academic'
+                        ? `Department: ${user?.department || 'Computer Science (CSE)'}`
+                        : `Location: Room ${deliveryRoom} · ${deliveryHostel}`}
+                    </span>
+                    <span className={`px-1.5 py-0.5 rounded font-mono text-3xs font-bold ${complaintDomain === 'academic'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                      }`}>
+                      {complaintDomain === 'academic' ? 'Protocol: HOD Review' : 'Protocol: Warden Review'}
+                    </span>
+                  </div>
+                  <p className="text-3xs opacity-90">
+                    {complaintDomain === 'academic'
+                      ? 'Issues are registered directly with the Head of Department (HOD) for academic interventions, faculty coordination, and lab administration.'
+                      : 'Complaints are registered with the Hostel Warden. The Warden reviews the requisition and assigns the duty technician with priority directives.'}
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowComplaintModal(false)}
+                    className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`px-4 py-2 text-white font-semibold rounded cursor-pointer transition-colors shadow-xs ${complaintDomain === 'academic'
+                        ? 'bg-emerald-700 hover:bg-emerald-800'
+                        : 'bg-slate-900 hover:bg-slate-800'
+                      }`}
+                  >
+                    {complaintDomain === 'academic' ? 'Submit to HOD' : 'Register Issue with Warden'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };

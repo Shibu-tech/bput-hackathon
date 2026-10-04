@@ -23,6 +23,8 @@ import {
   FileText,
   RotateCcw,
   ShieldAlert,
+  GraduationCap,
+  BookOpen,
 } from 'lucide-react';
 import { formatTaskTime } from '../../utils/timeFormat';
 
@@ -105,6 +107,72 @@ const CATEGORY_CONFIGS: Record<ComplaintCategory, CategoryConfig> = {
     badgeBg: 'bg-purple-100 text-purple-800',
     defaultTech: 'Radha Bai (Housekeeping Supervisor)',
   },
+  academic_lab: {
+    id: 'academic_lab',
+    label: 'Lab Workstations & Systems',
+    shortLabel: 'Lab Systems',
+    icon: Wrench,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50/50',
+    borderColor: 'border-indigo-200',
+    badgeBg: 'bg-indigo-100 text-indigo-800',
+    defaultTech: 'Systems Lab Administrator',
+  },
+  academic_exam: {
+    id: 'academic_exam',
+    label: 'Examination & Marksheet Verification',
+    shortLabel: 'Exam Cell',
+    icon: GraduationCap,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50/50',
+    borderColor: 'border-emerald-200',
+    badgeBg: 'bg-emerald-100 text-emerald-800',
+    defaultTech: 'Controller of Examinations Rep',
+  },
+  academic_faculty: {
+    id: 'academic_faculty',
+    label: 'Faculty & Timetable Consultation',
+    shortLabel: 'Timetable',
+    icon: BookOpen,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50/50',
+    borderColor: 'border-blue-200',
+    badgeBg: 'bg-blue-100 text-blue-800',
+    defaultTech: 'Subject Course Faculty Lead',
+  },
+  academic_notes: {
+    id: 'academic_notes',
+    label: 'LMS Study Materials & Notes',
+    shortLabel: 'Course Notes',
+    icon: BookOpen,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50/50',
+    borderColor: 'border-amber-200',
+    badgeBg: 'bg-amber-100 text-amber-800',
+    defaultTech: 'Department Academic Lead',
+  },
+  academic_attendance: {
+    id: 'academic_attendance',
+    label: 'Attendance & Biometric Discrepancy',
+    shortLabel: 'Attendance',
+    icon: CheckCircle2,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-50/50',
+    borderColor: 'border-cyan-200',
+    badgeBg: 'bg-cyan-100 text-cyan-800',
+    defaultTech: 'Academic Attendance Counselor',
+  },
+  academic_library: {
+    id: 'academic_library',
+    label: 'Library & Digital Portal Access',
+    shortLabel: 'Digital Library',
+    icon: BookOpen,
+    color: 'text-rose-600',
+    bgColor: 'bg-rose-50/50',
+    borderColor: 'border-rose-200',
+    badgeBg: 'bg-rose-100 text-rose-800',
+    defaultTech: 'Digital Library Lead',
+  },
 };
 
 const COMMON_RESOLUTION_PRESETS: Record<ComplaintCategory, string[]> = {
@@ -137,6 +205,30 @@ const COMMON_RESOLUTION_PRESETS: Record<ComplaintCategory, string[]> = {
     'Completed chemical descaling and high-pressure steam sanitization of washroom.',
     'Disinfected common touchpoints and replenished washroom supplies.',
     'Cleared floor drain trap and applied biological odor neutralizer.',
+  ],
+  academic_lab: [
+    'Reinstalled GPU drivers and verified student IDE environment on workstation.',
+    'Restored laboratory server network mount and checked student permissions.',
+  ],
+  academic_exam: [
+    'Re-evaluated script with subject professor; updated marks register in exam portal.',
+    'Corrected tabulation discrepancy in university examination database.',
+  ],
+  academic_faculty: [
+    'Rescheduled tutorial session to resolve timetable overlap for batch.',
+    'Arranged special faculty consultation office hour for student.',
+  ],
+  academic_notes: [
+    'Uploaded revised lecture presentation slides and laboratory manuals to portal.',
+    'Restored student access to departmental cloud LMS drive.',
+  ],
+  academic_attendance: [
+    'Reconciled medical leave certificate and adjusted biometric attendance records.',
+    'Verified professor attendance register and credited missing attendance count.',
+  ],
+  academic_library: [
+    'Renewed IEEE/ACM digital library credentials for student account.',
+    'Issued requested reference volume from central library reserved stack.',
   ],
 };
 

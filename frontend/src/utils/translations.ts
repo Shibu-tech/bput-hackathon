@@ -84,7 +84,7 @@ export const translations: Record<Language, TranslationDict> = {
       technician: 'Technician Desk',
       guard: 'Gate Security',
       mess: 'Mess & Cafeteria',
-      kiosk: 'Lobby Kiosk',
+      kiosk: 'Self-Service Kiosk',
       admin: 'System Administration',
       faculty: 'Faculty & Academics',
     },

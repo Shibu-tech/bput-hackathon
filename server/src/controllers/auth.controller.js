@@ -176,7 +176,7 @@ const register = asyncHandler(async (req, res) => {
   }
 
   // Check if staff registration needs pending verification (Faculty & HOD accounts are immediately active)
-  const isStaffRole = !['STUDENT', 'ADMIN', 'KIOSK', 'FACULTY', 'HOD'].includes(role);
+  const isStaffRole = !['STUDENT', 'ADMIN', 'FACULTY', 'HOD'].includes(role);
   const initialStatus = isStaffRole ? 'PENDING' : 'ACTIVE';
 
   // Create user object
@@ -426,7 +426,7 @@ const getStaffRequests = asyncHandler(async (req, res) => {
   const filter = {
     $or: [
       { employeeId: { $exists: true, $ne: '' } },
-      { role: { $in: ['FACULTY', 'HOD', 'ACCOUNTS', 'EXAM_CELL', 'WARDEN', 'MESS', 'TECHNICIAN', 'SECURITY'] } }
+      { role: { $in: ['FACULTY', 'HOD', 'ACCOUNTS', 'EXAM_CELL', 'WARDEN', 'MESS', 'TECHNICIAN', 'SECURITY', 'KIOSK'] } }
     ]
   };
 
