@@ -3,6 +3,7 @@ import { useCampusOps } from '../context/CampusOpsContext';
 import { useAuth } from '../context/AuthContext';
 import { translations } from '../utils/translations';
 import { UserRole, Language } from '../types';
+import sahajLogo from '../assets/images/Sahaj-logo.jpeg';
 import {
   ShieldAlert,
   WifiOff,
@@ -66,13 +67,18 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-16 gap-4">
 
           {/* Zone 1: Wordmark */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <img
+              src={sahajLogo}
+              alt="Sahaj Logo"
+              className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-lg shadow-2xs"
+            />
             <div className="text-left select-none">
               <span className="text-xl font-bold tracking-tight text-slate-900">
-                FretOps
+                Sahaj
               </span>
               <span className="text-xs font-semibold text-indigo-600 ml-1.5 tracking-wider uppercase">
-                Central
+                Campus Life, Debugged
               </span>
             </div>
           </div>
@@ -147,11 +153,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => setLowDataMode((prev) => !prev)}
               title="Toggle low-bandwidth lightweight mode"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${
-                lowDataMode
-                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                  : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${lowDataMode
+                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
             >
               <WifiOff className="w-3.5 h-3.5" />
               <span className="hidden md:inline">
@@ -162,11 +167,10 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Emergency Siren Trigger Shortcut */}
             <button
               onClick={onOpenEmergencyModal}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                activeEmergency
-                  ? 'bg-red-600 text-white animate-pulse shadow-md'
-                  : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${activeEmergency
+                ? 'bg-red-600 text-white animate-pulse shadow-md'
+                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                }`}
             >
               <ShieldAlert className="w-4 h-4 text-red-600" />
               <span className="hidden sm:inline">Emergency Siren</span>

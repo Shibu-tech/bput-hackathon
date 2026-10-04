@@ -41,6 +41,8 @@ const gatePassSchema = z.object({
   destination: z.string().optional(),
   requestedExitTime: timeStringSchema,
   expectedReturnTime: timeStringSchema,
+  leaveDate: z.string().optional(),
+  returnDate: z.string().optional(),
   clientRequestId: z.string().optional() // Optional for idempotency
 }).transform((data) => {
   // Ensure reason is present from reason or purpose or destination

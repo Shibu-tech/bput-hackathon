@@ -2,7 +2,7 @@ export type UserRole = 'student' | 'warden' | 'technician' | 'guard' | 'mess' | 
 
 export type Language = 'en' | 'or' | 'hi';
 
-export type PassType = 'day' | 'late_night' | 'weekend_leave' | 'emergency';
+export type PassType = 'day' | 'long_leave' | 'weekend_leave' | 'emergency';
 export type PassStatus = 'pending' | 'approved' | 'rejected' | 'checked_out' | 'completed' | 'overdue';
 
 export interface GatePass {
@@ -23,14 +23,19 @@ export interface GatePass {
   destination: string;
   outTime: string;
   expectedInTime: string;
+  leaveDate?: string;
+  returnDate?: string;
   actualOutTime?: string;
   actualInTime?: string;
+  clearedAt?: string | number;
   status: PassStatus;
   parentConsentVerified: boolean;
   parentPhone: string;
   approvedBy?: string;
   approvedAt?: string;
   rejectionReason?: string;
+  isPermanentPass?: boolean;
+  permanentQrCode?: string;
 }
 
 export type ComplaintCategory = 'electrical' | 'plumbing' | 'wifi' | 'carpentry' | 'cleaning' | 'ac';

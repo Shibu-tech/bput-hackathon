@@ -45,6 +45,64 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Your staff registration request has been rejected by the Super Admin.');
   }
 
+  // Validate that user's assigned role matches the role selected on login page
+  if (req.body.role) {
+    const roleNormalized = String(req.body.role).toLowerCase();
+    let userFrontendRole = 'student';
+    switch (user.role?.toUpperCase()) {
+      case 'STUDENT':
+        userFrontendRole = 'student';
+        break;
+      case 'WARDEN':
+        userFrontendRole = 'warden';
+        break;
+      case 'TECHNICIAN':
+        userFrontendRole = 'technician';
+        break;
+      case 'SECURITY':
+      case 'GUARD':
+        userFrontendRole = 'guard';
+        break;
+      case 'MESS':
+        userFrontendRole = 'mess';
+        break;
+      case 'KIOSK':
+        userFrontendRole = 'kiosk';
+        break;
+      case 'ADMIN':
+        userFrontendRole = 'admin';
+        break;
+      case 'FACULTY':
+      case 'HOD':
+      case 'EXAM_CELL':
+      case 'ACCOUNTS':
+        userFrontendRole = 'faculty';
+        break;
+      default:
+        userFrontendRole = 'student';
+    }
+
+    if (roleNormalized !== userFrontendRole) {
+      const roleDisplayNames = {
+        student: 'Student',
+        faculty: 'Faculty / Staff',
+        warden: 'Hostel Warden',
+        guard: 'Security Guard',
+        admin: 'Campus Admin',
+        technician: 'Maintenance Tech',
+        mess: 'Mess Manager',
+        kiosk: 'Self-Service Kiosk',
+      };
+      const actualName = roleDisplayNames[userFrontendRole] || userFrontendRole;
+      const requestedName = roleDisplayNames[roleNormalized] || roleNormalized;
+      return res.status(400).json({
+        success: false,
+        message: `Role mismatch: This account is registered as "${actualName}", not "${requestedName}". Please select "${actualName}" to sign in.`,
+        correctRole: userFrontendRole,
+      });
+    }
+  }
+
   // Generate token
   const token = jwt.generateToken({ userId: user._id });
 

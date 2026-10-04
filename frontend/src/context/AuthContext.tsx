@@ -144,14 +144,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const storedRole = localStorage.getItem('active_role') as UserRole | null;
         const validRoles: UserRole[] = ['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin', 'faculty'];
 
-        // If user's actual registered role is faculty or warden, ensure they aren't stuck on student from an old session
+        // Ensure user active role matches their registered role (unless Super Admin using switcher)
         let resolvedRole: UserRole = frontendRole;
-        if (storedRole && validRoles.includes(storedRole)) {
-          if (frontendRole === 'faculty' && storedRole === 'student') {
-            resolvedRole = 'faculty';
-          } else {
-            resolvedRole = storedRole;
-          }
+        if (backendRoleFromData === 'ADMIN' && storedRole && validRoles.includes(storedRole)) {
+          resolvedRole = storedRole;
+        } else {
+          resolvedRole = frontendRole;
         }
 
         const storedRoom = localStorage.getItem('student_assigned_room');
@@ -216,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       body: JSON.stringify({
         phoneNumber,
         password,
+        role: overrideRole,
       }),
     });
 
@@ -225,30 +224,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         (Array.isArray(errorData.errors) && errorData.errors[0]?.message) ||
         errorData.message ||
         'Login failed';
-      throw new Error(detailedMsg);
+      const err: any = new Error(detailedMsg);
+      if (errorData.correctRole) {
+        err.correctRole = errorData.correctRole;
+      }
+      throw err;
     }
 
     const data = await res.json();
-    const authToken = data.data?.token || data.token;
     const rawUser = data.data?.user || data.user;
+    const backendRoleFromData = rawUser.role;
+    setBackendRole(backendRoleFromData);
+    const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
 
+    const roleDisplayNames: Record<UserRole, string> = {
+      student: 'Student',
+      faculty: 'Faculty / Staff',
+      warden: 'Hostel Warden',
+      guard: 'Security Guard',
+      admin: 'Campus Admin',
+      technician: 'Maintenance Tech',
+      mess: 'Mess Manager',
+      kiosk: 'Self-Service Kiosk',
+    };
+
+    // Strict role matching check
+    if (overrideRole && overrideRole !== frontendRole) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('active_role');
+      setToken(null);
+      setUser(null);
+      const actualName = roleDisplayNames[frontendRole] || frontendRole;
+      const requestedName = roleDisplayNames[overrideRole] || overrideRole;
+      const err: any = new Error(
+        `Role mismatch: This account is registered as "${actualName}", not "${requestedName}". Please select "${actualName}" to sign in.`
+      );
+      err.correctRole = frontendRole;
+      throw err;
+    }
+
+    const authToken = data.data?.token || data.token;
     if (authToken) {
       localStorage.setItem('token', authToken);
       setToken(authToken);
     }
 
-    const backendRoleFromData = rawUser.role;
-    setBackendRole(backendRoleFromData);
-    const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
-
-    // If the registered backend role is FACULTY, automatically direct to faculty dashboard rather than defaulting to student
-    let resolvedRole = frontendRole;
-    if (overrideRole && overrideRole !== 'student') {
-      resolvedRole = overrideRole;
-    } else if (frontendRole === 'faculty') {
-      resolvedRole = 'faculty';
-    }
-
+    const resolvedRole = frontendRole;
     localStorage.setItem('active_role', resolvedRole);
 
     const storedRoom = localStorage.getItem('student_assigned_room');

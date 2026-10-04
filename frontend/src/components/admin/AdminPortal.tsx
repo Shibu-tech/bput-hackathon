@@ -35,6 +35,7 @@ export const AdminPortal: React.FC = () => {
     staffRequests,
     approveStaffRequest,
     rejectStaffRequest,
+    refreshStaffRequests,
     language,
     setLanguage,
   } = useCampusOps();
@@ -1260,8 +1261,8 @@ const TabButton: React.FC<{
   <button
     onClick={onClick}
     className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer border shadow-xs ${active
-        ? 'bg-indigo-600 text-white border-indigo-500'
-        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+      ? 'bg-indigo-600 text-white border-indigo-500'
+      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
       }`}
   >
     {icon}

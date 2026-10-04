@@ -32,6 +32,7 @@ import {
   Layers,
   ChevronRight,
   Filter,
+  Calendar,
 } from 'lucide-react';
 import campusAerialImg from '../../assets/images/campus_hostel_aerial_1790190005312.jpg';
 import { WardenAnalyticsView } from './WardenAnalyticsView';
@@ -74,7 +75,9 @@ export const WardenDashboard: React.FC = () => {
   const [rejectingPassId, setRejectingPassId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('Parent telephonic verification pending');
 
-  const pendingPasses = gatePasses.filter((p) => p.status === 'pending');
+  const pendingPasses = gatePasses.filter(
+    (p) => p.status === 'pending' && (p.passType === 'long_leave' || p.passType === 'weekend_leave')
+  );
   const overduePasses = gatePasses.filter((p) => p.status === 'overdue');
 
   // Stats calculation for 10:30 PM Curfew
@@ -255,7 +258,7 @@ export const WardenDashboard: React.FC = () => {
       <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-lg shadow-xs overflow-x-auto">
         {[
           { id: 'rollcall', label: '10:30 PM Night Roll Call', count: overdueCount > 0 ? overdueCount : undefined },
-          { id: 'approvals', label: 'Pending Gate Passes', count: pendingPasses.length },
+          { id: 'approvals', label: 'Pending Leave Passes', count: pendingPasses.length },
           { id: 'workload', label: 'Task Dispatch & Review Desk', count: complaints.filter(c => c.status === 'open' || c.status === 'rejected').length || undefined },
           { id: 'analytics', label: 'Real-Time Trends & Analytics' },
           { id: 'broadcast', label: 'Targeted Circulars & WhatsApp Replacement' },
@@ -400,16 +403,16 @@ export const WardenDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: PENDING GATE PASS APPROVALS */}
+      {/* TAB 2: PENDING LEAVE PASS APPROVALS */}
       {activeTab === 'approvals' && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Gate Pass Approvals Queue ({pendingPasses.length} pending)
+                Leave Pass Approvals Queue ({pendingPasses.length} pending)
               </h2>
               <p className="text-xs text-slate-500">
-                Review late-night outing & weekend leave requests with verified parent consent.
+                Review Long Leave requests with travel dates & guardian consent. Note: Standard Day Passes are automatically cleared by campus policy and do not require Warden authorization.
               </p>
             </div>
           </div>
@@ -417,7 +420,7 @@ export const WardenDashboard: React.FC = () => {
           {pendingPasses.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs">
               <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-              All gate pass requests reviewed. Zero pending queues!
+              All long leave pass requests reviewed. Zero pending queues!
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -437,6 +440,13 @@ export const WardenDashboard: React.FC = () => {
                       Out: {pass.outTime} → In: {pass.expectedInTime}
                     </span>
                   </div>
+
+                  {pass.leaveDate && (
+                    <div className="flex items-center gap-1.5 text-2xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+                      <Calendar className="w-3 h-3 text-indigo-600" />
+                      <span>Weekend Leave: {pass.leaveDate} &rarr; {pass.returnDate || 'Return'}</span>
+                    </div>
+                  )}
 
                   <div>
                     <div className="text-sm font-bold text-slate-900">{pass.studentName}</div>

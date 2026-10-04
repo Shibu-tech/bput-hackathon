@@ -13,7 +13,8 @@ const loginSchema = z.object({
     .regex(phoneRegex, 'Phone number must be exactly 10 digits'),
   password: z
     .string({ required_error: 'Password is required' })
-    .min(1, 'Password is required')
+    .min(1, 'Password is required'),
+  role: z.string().optional(),
 });
 
 /**

@@ -27,6 +27,12 @@ const gatePassSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  leaveDate: {
+    type: String
+  },
+  returnDate: {
+    type: String
+  },
   status: {
     type: String,
     enum: ['PENDING', 'APPROVED', 'REJECTED', 'EXITED', 'RETURNED', 'EXPIRED'],

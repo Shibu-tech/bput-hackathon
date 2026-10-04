@@ -20,7 +20,9 @@ const createGatePass = async (gatePassData) => {
     hostel,
     reason,
     requestedExitTime,
-    expectedReturnTime
+    expectedReturnTime,
+    leaveDate,
+    returnDate
   } = gatePassData;
 
   // 1. Check if gate pass with clientRequestId already exists (idempotency)
@@ -49,6 +51,8 @@ const createGatePass = async (gatePassData) => {
     reason,
     requestedExitTime: requestedExitDate,
     expectedReturnTime: expectedReturnDate,
+    leaveDate,
+    returnDate,
     status: 'PENDING'
   });
 
