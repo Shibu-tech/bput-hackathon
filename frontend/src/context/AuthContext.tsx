@@ -23,6 +23,11 @@ export const mapBackendRoleToFrontend = (backendRole?: string | null): UserRole 
       return 'kiosk';
     case 'ADMIN':
       return 'admin';
+    case 'FACULTY':
+    case 'HOD':
+    case 'EXAM_CELL':
+    case 'ACCOUNTS':
+      return 'faculty';
     default:
       return 'student';
   }
@@ -34,6 +39,14 @@ interface AuthContextType {
     fullName: string;
     role: UserRole;
     phoneNumber: string;
+    email?: string;
+    designation?: string;
+    employeeId?: string;
+    department?: string;
+    cabin?: string;
+    officeHours?: string;
+    bio?: string;
+    status?: string;
     hostel?: string;
     roomNumber?: string;
     bedLabel?: string;
@@ -48,6 +61,15 @@ interface AuthContextType {
   setActiveRole: (role: UserRole) => void;
 
   updateUserRoom: (roomData: { hostel: string; roomNumber: string; bedLabel: string }) => Promise<void>;
+  updateUserProfile: (profileData: Partial<{
+    fullName: string;
+    email: string;
+    designation: string;
+    department: string;
+    cabin: string;
+    officeHours: string;
+    bio: string;
+  }>) => Promise<void>;
 
   login: (phoneNumber: string, password: string, overrideRole?: UserRole) => Promise<void>;
 
@@ -60,11 +82,12 @@ interface AuthContextType {
     designation?: string;
     employeeId?: string;
     offerLetter?: string;
+    offerLetterName?: string;
     locationId?: string;
     hostel?: string;
     batch?: string;
     shifts?: any[];
-  }) => Promise<{ isPending?: boolean; message?: string } | void>;
+  }) => Promise<{ isPending?: boolean; message?: string; user?: any; data?: any } | void>;
 
   logout: () => void;
 }
@@ -119,8 +142,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setBackendRole(backendRoleFromData);
         const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
         const storedRole = localStorage.getItem('active_role') as UserRole | null;
-        const validRoles: UserRole[] = ['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin'];
-        const resolvedRole = (storedRole && validRoles.includes(storedRole)) ? storedRole : frontendRole;
+        const validRoles: UserRole[] = ['student', 'warden', 'technician', 'guard', 'mess', 'kiosk', 'admin', 'faculty'];
+
+        // Ensure user active role matches their registered role (unless Super Admin using switcher)
+        let resolvedRole: UserRole = frontendRole;
+        if (backendRoleFromData === 'ADMIN' && storedRole && validRoles.includes(storedRole)) {
+          resolvedRole = storedRole;
+        } else {
+          resolvedRole = frontendRole;
+        }
 
         const storedRoom = localStorage.getItem('student_assigned_room');
         let parsedRoom: { hostel?: string; roomNumber?: string; bedLabel?: string } | null = null;
@@ -139,12 +169,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           fullName: rawUser.fullName,
           role: resolvedRole,
           phoneNumber: rawUser.phoneNumber,
+          email: rawUser.email || '',
+          designation: rawUser.designation || (frontendRole === 'faculty' ? 'Assistant Professor / Faculty' : ''),
+          employeeId: rawUser.employeeId || '',
+          department: rawUser.department || (frontendRole === 'faculty' ? 'Computer Science & Engineering' : ''),
+          cabin: rawUser.cabin || (frontendRole === 'faculty' ? 'Academic Block B, Room 304' : ''),
+          officeHours: rawUser.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+          bio: rawUser.bio || '',
+          status: rawUser.status || 'ACTIVE',
           hostel: userHostel,
           roomNumber: userRoom,
           bedLabel: userBed,
           batch: rawUser.batch,
         });
         setActiveRoleState(resolvedRole);
+        localStorage.setItem('active_role', resolvedRole);
       } catch (err) {
         console.error('Auth error:', err);
         localStorage.removeItem('token');
@@ -175,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       body: JSON.stringify({
         phoneNumber,
         password,
+        role: overrideRole,
       }),
     });
 
@@ -184,23 +224,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         (Array.isArray(errorData.errors) && errorData.errors[0]?.message) ||
         errorData.message ||
         'Login failed';
-      throw new Error(detailedMsg);
+      const err: any = new Error(detailedMsg);
+      if (errorData.correctRole) {
+        err.correctRole = errorData.correctRole;
+      }
+      throw err;
     }
 
     const data = await res.json();
-    const authToken = data.data?.token || data.token;
     const rawUser = data.data?.user || data.user;
+    const backendRoleFromData = rawUser.role;
+    setBackendRole(backendRoleFromData);
+    const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
 
+    const roleDisplayNames: Record<UserRole, string> = {
+      student: 'Student',
+      faculty: 'Faculty / Staff',
+      warden: 'Hostel Warden',
+      guard: 'Security Guard',
+      admin: 'Campus Admin',
+      technician: 'Maintenance Tech',
+      mess: 'Mess Manager',
+      kiosk: 'Self-Service Kiosk',
+    };
+
+    // Strict role matching check
+    if (overrideRole && overrideRole !== frontendRole) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('active_role');
+      setToken(null);
+      setUser(null);
+      const actualName = roleDisplayNames[frontendRole] || frontendRole;
+      const requestedName = roleDisplayNames[overrideRole] || overrideRole;
+      const err: any = new Error(
+        `Role mismatch: This account is registered as "${actualName}", not "${requestedName}". Please select "${actualName}" to sign in.`
+      );
+      err.correctRole = frontendRole;
+      throw err;
+    }
+
+    const authToken = data.data?.token || data.token;
     if (authToken) {
       localStorage.setItem('token', authToken);
       setToken(authToken);
     }
 
-    const backendRoleFromData = rawUser.role;
-    setBackendRole(backendRoleFromData);
-    const frontendRole = mapBackendRoleToFrontend(backendRoleFromData);
-    const resolvedRole = overrideRole || frontendRole;
-
+    const resolvedRole = frontendRole;
     localStorage.setItem('active_role', resolvedRole);
 
     const storedRoom = localStorage.getItem('student_assigned_room');
@@ -220,6 +289,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       fullName: rawUser.fullName,
       role: resolvedRole,
       phoneNumber: rawUser.phoneNumber,
+      email: rawUser.email || '',
+      designation: rawUser.designation || (frontendRole === 'faculty' ? 'Assistant Professor / Faculty' : ''),
+      employeeId: rawUser.employeeId || '',
+      department: rawUser.department || (frontendRole === 'faculty' ? 'Computer Science & Engineering' : ''),
+      cabin: rawUser.cabin || (frontendRole === 'faculty' ? 'Academic Block B, Room 304' : ''),
+      officeHours: rawUser.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+      bio: rawUser.bio || '',
+      status: rawUser.status || 'ACTIVE',
       hostel: userHostel,
       roomNumber: userRoom,
       bedLabel: userBed,
@@ -260,6 +337,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Update Profile (Faculty / Staff / Student)
+  const updateUserProfile = async (profileData: Partial<{
+    fullName: string;
+    email: string;
+    designation: string;
+    department: string;
+    cabin: string;
+    officeHours: string;
+    bio: string;
+  }>) => {
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            ...profileData,
+          }
+        : null
+    );
+
+    const currentToken = token || localStorage.getItem('token');
+    if (currentToken) {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to update profile');
+      }
+
+      const data = await res.json();
+      const updatedUser = data.data?.user || data.user;
+      if (updatedUser) {
+        setUser((prev) => (prev ? { ...prev, ...updatedUser } : null));
+      }
+    }
+  };
+
   // Register
   const register = async (userData: {
     fullName: string;
@@ -270,11 +390,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     designation?: string;
     employeeId?: string;
     offerLetter?: string;
+    offerLetterName?: string;
     locationId?: string;
     hostel?: string;
     batch?: string;
     shifts?: any[];
-  }): Promise<{ isPending?: boolean; message?: string } | void> => {
+  }): Promise<{ isPending?: boolean; message?: string; user?: any; data?: any } | void> => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
@@ -294,7 +415,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const data = await res.json();
     if (data.isPending) {
-      return { isPending: true, message: data.message };
+      return { isPending: true, message: data.message, user: data.data?.user || data.user, data: data.data };
     }
 
     const authToken = data.data?.token || data.token;
@@ -315,6 +436,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         fullName: rawUser.fullName,
         role: frontendRole,
         phoneNumber: rawUser.phoneNumber,
+        email: rawUser.email || userData.email || '',
+        designation: rawUser.designation || userData.designation || '',
+        employeeId: rawUser.employeeId || userData.employeeId || '',
+        department: rawUser.department || 'Computer Science & Engineering',
+        cabin: rawUser.cabin || 'Academic Block B, Room 304',
+        officeHours: rawUser.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+        bio: rawUser.bio || '',
+        status: rawUser.status || 'ACTIVE',
         hostel: rawUser.hostel || userData.hostel,
         roomNumber: rawUser.roomNumber,
         bedLabel: rawUser.bedLabel || 'A',
@@ -322,6 +451,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     }
     setActiveRoleState(frontendRole);
+    localStorage.setItem('active_role', frontendRole);
   };
 
   const setActiveRole = (newRole: UserRole) => {
@@ -353,6 +483,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         activeRole,
         setActiveRole,
         updateUserRoom,
+        updateUserProfile,
         login,
         register,
         logout,

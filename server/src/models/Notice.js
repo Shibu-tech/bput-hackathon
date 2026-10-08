@@ -3,11 +3,13 @@ const mongoose = require('mongoose');
 const noticeSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   body: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   isEmergency: {
     type: Boolean,
@@ -16,11 +18,11 @@ const noticeSchema = new mongoose.Schema({
   targetAudience: {
     hostel: {
       type: String,
-      enum: ['Hostel A', 'Hostel B', 'Hostel C', 'ALL']
+      default: 'ALL'
     },
     batch: {
       type: String,
-      enum: ['2023', '2024', '2025', 'ALL'] // Adjust as needed
+      default: 'ALL'
     }
   },
   createdBy: {

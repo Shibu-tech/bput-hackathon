@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { StaffRegistrationRequest } from '../../types';
 import {
@@ -29,7 +29,7 @@ export const StaffVerificationModal: React.FC<StaffVerificationModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { staffRequests, approveStaffRequest, rejectStaffRequest } = useCampusOps();
+  const { staffRequests, approveStaffRequest, rejectStaffRequest, refreshStaffRequests } = useCampusOps();
 
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +37,12 @@ export const StaffVerificationModal: React.FC<StaffVerificationModalProps> = ({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshStaffRequests();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -125,43 +131,39 @@ export const StaffVerificationModal: React.FC<StaffVerificationModalProps> = ({
           <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
             <button
               onClick={() => setActiveFilter('ALL')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                activeFilter === 'ALL'
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${activeFilter === 'ALL'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-white text-slate-600 hover:bg-slate-200/60 border border-slate-200'
-              }`}
+                }`}
             >
               All ({totalCount})
             </button>
             <button
               onClick={() => setActiveFilter('PENDING')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeFilter === 'PENDING'
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${activeFilter === 'PENDING'
                   ? 'bg-amber-600 text-white shadow-xs'
                   : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200'
-              }`}
+                }`}
             >
               <Clock className="w-3.5 h-3.5" />
               Pending ({pendingCount})
             </button>
             <button
               onClick={() => setActiveFilter('APPROVED')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeFilter === 'APPROVED'
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${activeFilter === 'APPROVED'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
-              }`}
+                }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               Approved ({approvedCount})
             </button>
             <button
               onClick={() => setActiveFilter('REJECTED')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeFilter === 'REJECTED'
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${activeFilter === 'REJECTED'
                   ? 'bg-rose-600 text-white shadow-xs'
                   : 'bg-white text-rose-700 hover:bg-rose-50 border border-rose-200'
-              }`}
+                }`}
             >
               <XCircle className="w-3.5 h-3.5" />
               Rejected ({rejectedCount})
@@ -295,7 +297,7 @@ export const StaffVerificationModal: React.FC<StaffVerificationModalProps> = ({
                         onClick={() =>
                           setSelectedDocument({
                             name: req.offerLetterName || 'Offer Letter',
-                            url: req.offerLetterUrl,
+                            url: req.offerLetterUrl || req.offerLetter,
                           })
                         }
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
@@ -384,56 +386,119 @@ export const StaffVerificationModal: React.FC<StaffVerificationModalProps> = ({
 
       {/* Document View Preview Modal */}
       {selectedDocument && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-5 space-y-4 border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">{selectedDocument.name}</h3>
-              </div>
-              <button
-                onClick={() => setSelectedDocument(null)}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="bg-slate-100 rounded-xl p-4 flex flex-col items-center justify-center min-h-[350px] max-h-[500px] overflow-auto">
-              {selectedDocument.url && selectedDocument.url.startsWith('data:image') ? (
-                <img
-                  src={selectedDocument.url}
-                  alt={selectedDocument.name}
-                  className="max-h-[460px] object-contain rounded-lg shadow-xs"
-                />
-              ) : selectedDocument.url && selectedDocument.url.startsWith('http') ? (
-                <img
-                  src={selectedDocument.url}
-                  alt={selectedDocument.name}
-                  className="max-h-[460px] object-contain rounded-lg shadow-xs"
-                />
-              ) : (
-                <div className="text-center p-8 space-y-3">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
-                    <FileText className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">{selectedDocument.name}</h4>
-                    <p className="text-xs text-slate-500 mt-1">Official Employment Contract & Offer Document</p>
-                  </div>
-                  <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-full">
-                    Digital Seal & Signature Verified
-                  </span>
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-5 space-y-4 border border-slate-200 flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
+                  <FileText className="w-5 h-5" />
                 </div>
-              )}
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 truncate">{selectedDocument.name}</h3>
+                  <p className="text-2xs text-slate-500">Official Employment Appointment & Verification Document</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedDocument.url && (
+                  <>
+                    <a
+                      href={selectedDocument.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer"
+                      title="Open full document in a new browser tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open Original</span>
+                    </a>
+                    <a
+                      href={selectedDocument.url}
+                      download={selectedDocument.name}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                      title="Download original document"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download</span>
+                    </a>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedDocument(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="bg-slate-50 rounded-xl p-2 flex flex-col items-center justify-center flex-1 min-h-[420px] max-h-[600px] overflow-hidden border border-slate-200">
+              {(() => {
+                const url = selectedDocument.url || '';
+                const name = (selectedDocument.name || '').toLowerCase();
+                const isPdf = url.startsWith('data:application/pdf') || url.toLowerCase().includes('.pdf') || name.endsWith('.pdf');
+                const isImg = url.startsWith('data:image/') || url.match(/\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i) || url.includes('images.unsplash.com');
+
+                if (isPdf && url) {
+                  return (
+                    <iframe
+                      src={url}
+                      title={selectedDocument.name}
+                      className="w-full h-[540px] rounded-lg border border-slate-200 bg-white"
+                    />
+                  );
+                }
+
+                if (isImg && url) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center p-3 overflow-auto">
+                      <img
+                        src={url}
+                        alt={selectedDocument.name}
+                        className="max-h-[520px] w-auto max-w-full rounded-lg object-contain shadow-xs border border-slate-200"
+                      />
+                    </div>
+                  );
+                }
+
+                if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                  return (
+                    <iframe
+                      src={url}
+                      title={selectedDocument.name}
+                      className="w-full h-[540px] rounded-lg border border-slate-200 bg-white"
+                    />
+                  );
+                }
+
+                return (
+                  <div className="text-center p-8 space-y-3">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center mx-auto text-indigo-600">
+                      <FileText className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">{selectedDocument.name}</h4>
+                      <p className="text-xs text-slate-500 mt-1">Official Employment Contract & Offer Document</p>
+                    </div>
+                    <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-full">
+                      Digital Seal & Signature Verified
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-2xs text-slate-400">
+                Hosted securely on Supabase Storage
+              </span>
               <button
                 onClick={() => setSelectedDocument(null)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 cursor-pointer"
+                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 cursor-pointer transition-colors"
               >
-                Done Viewing
+                Close Preview
               </button>
             </div>
           </div>

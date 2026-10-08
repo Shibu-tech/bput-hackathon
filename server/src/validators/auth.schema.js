@@ -13,7 +13,8 @@ const loginSchema = z.object({
     .regex(phoneRegex, 'Phone number must be exactly 10 digits'),
   password: z
     .string({ required_error: 'Password is required' })
-    .min(1, 'Password is required')
+    .min(1, 'Password is required'),
+  role: z.string().optional(),
 });
 
 /**
@@ -51,6 +52,7 @@ const registerSchema = z.object({
   designation: z.string().optional(),
   employeeId: z.string().optional(),
   offerLetter: z.string().optional(),
+  offerLetterName: z.string().optional(),
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'ACTIVE']).optional(),
   // Optional fields based on role
   locationId: z.string().optional(), // For students

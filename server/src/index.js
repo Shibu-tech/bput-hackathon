@@ -2,6 +2,7 @@ const http = require('http');
 const { app, connectDB } = require('./app');
 const { initSocketIO } = require('./sockets');
 const { startJobs } = require('./jobs');
+const { syncGridFsToSupabase } = require('./services/supabase.service');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 5000;
@@ -12,6 +13,11 @@ const startServer = async () => {
     // Connect to database first
     await connectDB();
     console.log('MongoDB connected successfully');
+
+    // Run non-blocking GridFS-to-Supabase migration sync
+    syncGridFsToSupabase().catch((syncErr) => {
+      console.warn('Startup GridFS sync notice:', syncErr.message);
+    });
 
     // Create HTTP server and socket layer
     const server = http.createServer(app);

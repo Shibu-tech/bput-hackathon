@@ -14,6 +14,7 @@ import {
   Phone,
   ArrowRight,
   AlertCircle,
+  BookOpen,
 } from 'lucide-react';
 
 interface RoleConfig {
@@ -31,6 +32,13 @@ const ROLE_OPTIONS: RoleConfig[] = [
     description: 'Gate pass requests, room services, and attendance',
     icon: GraduationCap,
     badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
+  {
+    id: 'faculty',
+    label: 'Faculty / Staff',
+    description: 'Academic dashboard, notices, attendance, marks & study notes',
+    icon: BookOpen,
+    badgeColor: 'bg-violet-50 text-violet-700 border-violet-200',
   },
   {
     id: 'warden',
@@ -81,6 +89,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('student');
+  const [suggestedRole, setSuggestedRole] = useState<UserRole | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -97,6 +106,7 @@ const Login: React.FC = () => {
   const handleRoleChange = (newRole: UserRole) => {
     setSelectedRole(newRole);
     setError(null);
+    setSuggestedRole(null);
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,6 +114,7 @@ const Login: React.FC = () => {
     // Allow users to see what they type, but clean up error state
     setPhoneNumber(rawVal);
     setError(null);
+    setSuggestedRole(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,6 +150,11 @@ const Login: React.FC = () => {
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please verify credentials.');
+      if (err.correctRole) {
+        setSuggestedRole(err.correctRole as UserRole);
+      } else {
+        setSuggestedRole(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -300,9 +316,29 @@ const Login: React.FC = () => {
           </form>
 
           {error && (
-            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl flex flex-col gap-2.5">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span className="leading-snug">{error}</span>
+              </div>
+              {suggestedRole && (
+                <div className="pt-2 border-t border-red-200/80 flex items-center justify-between gap-2">
+                  <span className="text-2xs text-red-600 font-semibold">
+                    Switch Access Role to match credentials:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole(suggestedRole);
+                      setError(null);
+                      setSuggestedRole(null);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
+                  >
+                    Select {ROLE_OPTIONS.find((r) => r.id === suggestedRole)?.label || suggestedRole}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

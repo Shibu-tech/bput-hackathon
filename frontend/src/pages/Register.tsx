@@ -7,7 +7,7 @@ import {
   Briefcase,
   Layers,
   Calculator,
-  FileCheck2,
+  Monitor,
   Building2,
   UtensilsCrossed,
   Wrench,
@@ -77,15 +77,15 @@ const STAFF_ROLES: StaffRoleOption[] = [
     borderHover: 'hover:border-emerald-400 hover:shadow-emerald-100',
   },
   {
-    id: 'examination',
-    roleKey: 'EXAM_CELL',
-    title: 'Examination Cell',
-    subtitle: 'Exams controller, marks recording & grading superintendent',
-    defaultDesignation: 'Controller of Examinations / Superintendent',
-    icon: FileCheck2,
-    color: 'text-blue-600',
-    bgLight: 'bg-blue-50/70',
-    borderHover: 'hover:border-blue-400 hover:shadow-blue-100',
+    id: 'kiosk',
+    roleKey: 'KIOSK',
+    title: 'Self-Service Kiosk / Help Desk',
+    subtitle: 'Campus terminal & help desk for students without smartphones to access portal services',
+    defaultDesignation: 'Kiosk & Student Help Desk Administrator',
+    icon: Monitor,
+    color: 'text-sky-600',
+    bgLight: 'bg-sky-50/70',
+    borderHover: 'hover:border-sky-400 hover:shadow-sky-100',
   },
   {
     id: 'warden',
@@ -297,14 +297,16 @@ const Register: React.FC = () => {
         designation: designation.trim(),
         employeeId: employeeId.trim(),
         offerLetter: offerLetterFile?.dataUrl || '',
+        offerLetterName: offerLetterFile?.name || 'Offer_Letter.pdf',
       };
 
       // Register via backend/context
-      await register(staffRegistrationPayload);
+      const regResult = await register(staffRegistrationPayload);
+      const serverUser = (regResult as any)?.user || (regResult as any)?.data?.user;
 
       // Add to Super Admin local request list for immediate review & synchronization
       addStaffRequest({
-        id: `sr-${Date.now()}`,
+        id: serverUser?.id ? serverUser.id.toString() : `sr-${Date.now()}`,
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         phoneNumber: phoneNumber.trim(),
@@ -312,8 +314,9 @@ const Register: React.FC = () => {
         roleLabel: selectedRole.title,
         designation: designation.trim(),
         employeeId: employeeId.trim(),
-        offerLetterName: offerLetterFile?.name || 'Offer_Letter.pdf',
-        offerLetterUrl: offerLetterFile?.dataUrl,
+        offerLetterName: serverUser?.offerLetterName || offerLetterFile?.name || 'Offer_Letter.pdf',
+        offerLetterUrl: serverUser?.offerLetterUrl || serverUser?.offerLetter || offerLetterFile?.dataUrl,
+        offerLetter: serverUser?.offerLetter || serverUser?.offerLetterUrl || offerLetterFile?.dataUrl,
         status: 'PENDING',
         createdAt: 'Just now',
       });
@@ -383,12 +386,13 @@ const Register: React.FC = () => {
             <div className="space-y-0.5">
               <span className="font-bold">Are you a Student?</span>
               <p className="text-amber-800 text-[11.5px] leading-relaxed">
-                Student accounts cannot register here. Your unique portal credentials and roll numbers are provisioned
-                automatically by the University Registrar upon admission.{' '}
+                Student accounts cannot register here. Your credentials and roll numbers are provisioned
+                automatically upon admission.{' '}
                 <Link to="/login" className="font-bold text-amber-900 underline hover:text-amber-950">
                   Log in directly here
                 </Link>
-                .
+                . Students without smartphones can access portal services and print slips at any{' '}
+                <strong className="font-semibold text-amber-950">Self-Service Kiosk / Help Desk</strong> terminal in campus lobbies.
               </p>
             </div>
           </div>
@@ -890,22 +894,45 @@ const Register: React.FC = () => {
           {/* =========================================================
               SLIDE 5: CONFIRMATION / VERIFICATION PENDING
           ========================================================= */}
+          {/* =========================================================
+              SLIDE 5: CONFIRMATION / VERIFICATION OR ACTIVE
+          ========================================================= */}
           {currentSlide === 5 && (
             <div className="py-8 text-center space-y-5">
-              <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm animate-bounce">
-                <Clock className="w-8 h-8" />
-              </div>
+              {selectedRole?.roleKey === 'FACULTY' || selectedRole?.roleKey === 'HOD' ? (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 mx-auto shadow-sm animate-pulse">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
 
-              <div className="space-y-2 max-w-md mx-auto">
-                <span className="inline-block px-3 py-1 bg-amber-100/70 border border-amber-300 text-amber-800 text-xs font-bold rounded-full">
-                  Status: Pending Super Admin Verification
-                </span>
-                <h2 className="text-xl font-extrabold text-slate-900">Application Transmitted Successfully!</h2>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Your staff registration with Employee ID <strong className="text-indigo-600">{employeeId}</strong> and
-                  attached offer letter have been submitted to the Super Admin for security verification.
-                </p>
-              </div>
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <span className="inline-block px-3.5 py-1 bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-full">
+                      ✓ Status: Account Active & Verified
+                    </span>
+                    <h2 className="text-xl font-extrabold text-slate-900">Welcome to Faculty Portal!</h2>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Your faculty account (<strong className="text-indigo-600">{employeeId}</strong>) has been verified. You can now manage student attendance, upload marks, share study notes, and publish circulars.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm animate-bounce">
+                    <Clock className="w-8 h-8" />
+                  </div>
+
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <span className="inline-block px-3 py-1 bg-amber-100/70 border border-amber-300 text-amber-800 text-xs font-bold rounded-full">
+                      Status: Pending Super Admin Verification
+                    </span>
+                    <h2 className="text-xl font-extrabold text-slate-900">Application Transmitted Successfully!</h2>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Your staff registration with Employee ID <strong className="text-indigo-600">{employeeId}</strong> and
+                      attached offer letter have been submitted to the Super Admin for security verification.
+                    </p>
+                  </div>
+                </>
+              )}
 
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl max-w-sm mx-auto text-xs text-left space-y-1.5">
                 <div className="flex justify-between">
@@ -926,15 +953,26 @@ const Register: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md cursor-pointer transition-all"
-                >
-                  <span>Return to Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                {selectedRole?.roleKey === 'FACULTY' || selectedRole?.roleKey === 'HOD' ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md cursor-pointer transition-all"
+                  >
+                    <span>Enter Faculty Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md cursor-pointer transition-all"
+                  >
+                    <span>Return to Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -953,12 +991,15 @@ const Register: React.FC = () => {
 
       {/* Offer Letter Document Preview Dialog */}
       {previewModalOpen && offerLetterFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-5 space-y-4 border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-5 space-y-4 border border-slate-200 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">{offerLetterFile.name}</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{offerLetterFile.name}</h3>
+                  <p className="text-2xs text-slate-400">{offerLetterFile.size} · {offerLetterFile.type || 'Document'}</p>
+                </div>
               </div>
               <button
                 type="button"
@@ -969,23 +1010,45 @@ const Register: React.FC = () => {
               </button>
             </div>
 
-            <div className="bg-slate-100 rounded-xl p-4 flex flex-col items-center justify-center min-h-[300px] max-h-[460px] overflow-auto">
-              {offerLetterFile.dataUrl.startsWith('data:image') || offerLetterFile.dataUrl.startsWith('http') ? (
-                <img
-                  src={offerLetterFile.dataUrl}
-                  alt={offerLetterFile.name}
-                  className="max-h-[420px] object-contain rounded-lg shadow-xs"
-                />
-              ) : (
-                <div className="text-center p-6 space-y-2">
-                  <FileText className="w-12 h-12 text-indigo-600 mx-auto" />
-                  <h4 className="text-sm font-bold text-slate-800">{offerLetterFile.name}</h4>
-                  <p className="text-xs text-slate-500">Official PDF Appointment Letter</p>
-                  <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
-                    File attached & ready for Super Admin verification
-                  </span>
-                </div>
-              )}
+            <div className="bg-slate-50 rounded-xl p-2 flex flex-col items-center justify-center min-h-[350px] max-h-[540px] overflow-hidden border border-slate-200">
+              {(() => {
+                const dataUrl = offerLetterFile.dataUrl || '';
+                const isPdf = offerLetterFile.type === 'application/pdf' || dataUrl.startsWith('data:application/pdf') || offerLetterFile.name.toLowerCase().endsWith('.pdf');
+                const isImg = offerLetterFile.type.startsWith('image/') || dataUrl.startsWith('data:image/');
+
+                if (isPdf && dataUrl) {
+                  return (
+                    <iframe
+                      src={dataUrl}
+                      title={offerLetterFile.name}
+                      className="w-full h-[500px] rounded-lg border border-slate-200 bg-white"
+                    />
+                  );
+                }
+
+                if (isImg && dataUrl) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center p-2 overflow-auto">
+                      <img
+                        src={dataUrl}
+                        alt={offerLetterFile.name}
+                        className="max-h-[480px] w-auto max-w-full rounded-lg object-contain shadow-xs border border-slate-200"
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="text-center p-6 space-y-2">
+                    <FileText className="w-12 h-12 text-indigo-600 mx-auto" />
+                    <h4 className="text-sm font-bold text-slate-800">{offerLetterFile.name}</h4>
+                    <p className="text-xs text-slate-500">Official Document Attachment</p>
+                    <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
+                      File attached & ready for Super Admin verification
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex justify-end">

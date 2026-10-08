@@ -10,7 +10,7 @@ const requireRole = require('../middleware/requireRole');
 router.post(
   '/',
   authenticate,
-  requireRole('WARDEN', 'ADMIN'),
+  requireRole('WARDEN', 'ADMIN', 'FACULTY'),
   validate(noticeSchema, 'body'),
   noticeController.createNotice
 );
@@ -20,6 +20,14 @@ router.get(
   '/',
   authenticate,
   noticeController.getNotices
+);
+
+// DELETE /api/notices/:id
+router.delete(
+  '/:id',
+  authenticate,
+  requireRole('WARDEN', 'ADMIN', 'FACULTY'),
+  noticeController.deleteNotice
 );
 
 module.exports = router;

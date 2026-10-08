@@ -1,8 +1,8 @@
-export type UserRole = 'student' | 'warden' | 'technician' | 'guard' | 'mess' | 'kiosk' | 'admin';
+export type UserRole = 'student' | 'warden' | 'technician' | 'guard' | 'mess' | 'kiosk' | 'admin' | 'faculty';
 
-export type Language = 'en' | 'hi' | 'te' | 'ta' | 'mr';
+export type Language = 'en' | 'or' | 'hi';
 
-export type PassType = 'day' | 'late_night' | 'weekend_leave' | 'emergency';
+export type PassType = 'day' | 'long_leave' | 'weekend_leave' | 'emergency';
 export type PassStatus = 'pending' | 'approved' | 'rejected' | 'checked_out' | 'completed' | 'overdue';
 
 export interface GatePass {
@@ -23,23 +23,45 @@ export interface GatePass {
   destination: string;
   outTime: string;
   expectedInTime: string;
+  leaveDate?: string;
+  returnDate?: string;
   actualOutTime?: string;
   actualInTime?: string;
+  clearedAt?: string | number;
   status: PassStatus;
-  parentConsentVerified: boolean;
+  parentConsentVerified?: boolean;
   parentPhone: string;
   approvedBy?: string;
   approvedAt?: string;
   rejectionReason?: string;
+  isPermanentPass?: boolean;
+  permanentQrCode?: string;
 }
 
-export type ComplaintCategory = 'electrical' | 'plumbing' | 'wifi' | 'carpentry' | 'cleaning' | 'ac';
+export type ComplaintDomain = 'academic' | 'hostel';
+
+export type ComplaintCategory =
+  | 'electrical'
+  | 'plumbing'
+  | 'wifi'
+  | 'carpentry'
+  | 'cleaning'
+  | 'ac'
+  | 'academic_lab'
+  | 'academic_exam'
+  | 'academic_faculty'
+  | 'academic_notes'
+  | 'academic_attendance'
+  | 'academic_library';
+
 export type ComplaintPriority = 'low' | 'medium' | 'high' | 'critical';
 export type ComplaintStatus = 'open' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
 
 export interface Complaint {
   id: string;
   ticketNumber: string;
+  domain?: ComplaintDomain;
+  department?: string;
   category: ComplaintCategory;
   title: string;
   description: string;
@@ -66,6 +88,24 @@ export interface Complaint {
   upvotes: number;
   aiSummary?: string;
 }
+
+export const isAcademicComplaint = (c: Complaint): boolean => {
+  if (c.domain === 'academic') return true;
+  if (c.domain === 'hostel') return false;
+  if (
+    c.category?.startsWith('academic_') ||
+    c.ticketNumber?.startsWith('ACAD-') ||
+    (c.hostelBlock && c.hostelBlock.toLowerCase().includes('academic')) ||
+    (c.roomNumber && (c.roomNumber.toLowerCase().includes('lab') || c.roomNumber.toLowerCase().includes('hall') || c.roomNumber.toLowerCase().includes('classroom')))
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const isHostelComplaint = (c: Complaint): boolean => {
+  return !isAcademicComplaint(c);
+};
 
 export interface DeduplicatedTicket {
   id: string;
@@ -197,6 +237,7 @@ export interface StaffRegistrationRequest {
   employeeId: string;
   offerLetterName?: string;
   offerLetterUrl?: string;
+  offerLetter?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string | number;
   verifiedAt?: string | number;
@@ -204,3 +245,158 @@ export interface StaffRegistrationRequest {
   verifiedBy?: string;
 }
 
+export interface StudentEnrolled {
+  _id: string;
+  fullName: string;
+  phoneNumber: string;
+  hostel?: string;
+  roomNumber?: string;
+  bedLabel?: string;
+  batch?: string;
+  email?: string;
+}
+
+export interface StudentRecordMarks {
+  studentId?: string;
+  studentName: string;
+  rollNumber: string;
+  marksObtained: number;
+  grade?: string;
+  remarks?: string;
+}
+
+export interface Marksheet {
+  _id: string;
+  subject: string;
+  subjectCode?: string;
+  examType: string;
+  batch: string;
+  semester: string;
+  maxMarks: number;
+  passingMarks: number;
+  records: StudentRecordMarks[];
+  uploadedBy?: {
+    _id?: string;
+    fullName: string;
+    role?: string;
+    designation?: string;
+    department?: string;
+    email?: string;
+  };
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface StudyNote {
+  _id: string;
+  title: string;
+  subject: string;
+  description: string;
+  batch: string;
+  semester: string;
+  category: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: string;
+  fileType: string;
+  downloadsCount: number;
+  uploadedBy?: {
+    _id?: string;
+    fullName: string;
+    role?: string;
+    designation?: string;
+    department?: string;
+    email?: string;
+  };
+  createdAt: string;
+}
+
+export interface FacultyNoticeItem {
+  _id: string;
+  title: string;
+  body: string;
+  isEmergency: boolean;
+  targetAudience?: {
+    hostel?: string;
+    batch?: string;
+  };
+  createdBy?: {
+    _id?: string;
+    fullName: string;
+    role?: string;
+  };
+  createdAt: string;
+}
+
+// ==========================================
+// ACADEMIC & CERTIFICATE TYPES
+// ==========================================
+
+export type CertificateType = 'no_due' | 'bonafide';
+export type CertificateStatus = 'approved' | 'pending' | 'rejected';
+
+export interface ClearanceItem {
+  department: string;
+  status: string;
+  verified: boolean;
+  clearedBy: string;
+  clearedDate: string;
+  remarks: string;
+}
+
+export interface CertificateRequest {
+  id: string;
+  certificateNumber: string;
+  type: CertificateType;
+  studentName: string;
+  rollNumber: string;
+  branch: string;
+  academicYear: string;
+  semester: string;
+  purpose: string;
+  urgent?: boolean;
+  requestDate: string;
+  status: CertificateStatus;
+  approvedDate?: string;
+  approvedBy?: string;
+  qrCodeToken?: string;
+  clearanceDetails?: ClearanceItem[];
+  remarks?: string;
+}
+
+export interface SubjectMark {
+  subjectCode: string;
+  subjectName: string;
+  credits: number;
+  facultyName: string;
+  category: 'Core Theory' | 'Professional Elective' | 'Basic Sciences' | 'Laboratory / Practical';
+  // Marks components explicitly requested: internals, semester, quiz, surprise test
+  quizScore: number;
+  quizMax: number;
+  surpriseTestScore: number;
+  surpriseTestMax: number;
+  internalScore: number;
+  internalMax: number;
+  semesterScore: number;
+  semesterMax: number;
+  // Computed / aggregated
+  totalScore: number;
+  totalMax: number;
+  grade: 'O' | 'E' | 'A' | 'B' | 'C' | 'D' | 'F';
+  gradePoint: number;
+  status: 'PASS' | 'FAIL' | 'ABSENT';
+}
+
+export interface SemesterMarksheet {
+  semesterId: string;
+  semesterName: string;
+  academicYear: string;
+  branch: string;
+  sgpa: number;
+  cgpa: number;
+  totalCredits: number;
+  earnedCredits: number;
+  publishedDate: string;
+  resultStatus: 'Passed with Distinction' | 'Passed' | 'Result Withheld';
+  subjects: SubjectMark[];
+}

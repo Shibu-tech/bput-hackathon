@@ -41,7 +41,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Body parser with 50mb limit for large documents & GridFS uploads
+// Body parser with 50mb limit for large documents & Supabase uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -54,6 +54,8 @@ app.use('/api/gate-passes', gatePassRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/mess', messRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/marks', marksRoutes);
+app.use('/api/notes', noteRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/ai', aiRoutes);

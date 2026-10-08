@@ -242,12 +242,11 @@ const getTickets = async (filters, user) => {
       query.assignedTechId = user._id;
       break;
     case 'WARDEN':
-      // Wardens can see tickets in their hostel
-      // For simplicity, we'll show all tickets - can be refined later
-      break;
+    case 'FACULTY':
+    case 'HOD':
     case 'ADMIN':
     case 'SECURITY':
-      // Can see all tickets
+      // Wardens, HODs, Faculty, and Admins can see campus tickets
       break;
     default:
       break;

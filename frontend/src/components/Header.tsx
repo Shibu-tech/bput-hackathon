@@ -3,6 +3,7 @@ import { useCampusOps } from '../context/CampusOpsContext';
 import { useAuth } from '../context/AuthContext';
 import { translations } from '../utils/translations';
 import { UserRole, Language } from '../types';
+import sahajLogo from '../assets/images/Sahaj-logo.jpeg';
 import {
   ShieldAlert,
   WifiOff,
@@ -15,10 +16,7 @@ import {
 
 interface HeaderProps {
   onOpenEmergencyModal: () => void;
-  onOpenAdoptionPlaybook: () => void;
   onOpenStaffVerification?: () => void;
-  activeView: string;
-  setActiveView: (view: string) => void;
   activeRole: UserRole;
   setActiveRole: (role: UserRole) => void;
   isSuperAdmin: boolean;
@@ -26,10 +24,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenEmergencyModal,
-  onOpenAdoptionPlaybook,
   onOpenStaffVerification,
-  activeView,
-  setActiveView,
   activeRole,
   setActiveRole,
   isSuperAdmin,
@@ -56,12 +51,12 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'mess', label: t.roles.mess },
     { id: 'kiosk', label: t.roles.kiosk },
     { id: 'admin', label: t.roles.admin },
+    { id: 'faculty', label: t.roles.faculty },
   ];
 
   const handleRoleChange = (newRole: UserRole) => {
     setActiveRole(newRole);
     setRole(newRole);
-    setActiveView('main');
   };
 
   const activeRoleLabel = roleOptions.find((r) => r.id === activeRole)?.label || activeRole;
@@ -72,18 +67,20 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-16 gap-4">
 
           {/* Zone 1: Wordmark */}
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setActiveView('main')}
-              className="text-left group cursor-pointer focus-visible:outline-none"
-            >
-              <span className="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
-                FretOps
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <img
+              src={sahajLogo}
+              alt="Sahaj Logo"
+              className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-lg shadow-2xs"
+            />
+            <div className="text-left select-none">
+              <span className="text-xl font-bold tracking-tight text-slate-900">
+                Sahaj
               </span>
               <span className="text-xs font-semibold text-indigo-600 ml-1.5 tracking-wider uppercase">
-                Central
+                Campus Life, Debugged
               </span>
-            </button>
+            </div>
           </div>
 
           {/* Zone 2: Navigation Links / Role Dashboard Indicator */}
@@ -133,17 +130,6 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </button>
             )}
-
-            <button
-              onClick={onOpenAdoptionPlaybook}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ml-1 border ${
-                activeView === 'adoption'
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              Rollout Playbook
-            </button>
           </nav>
 
           {/* Zone 3: Primary Actions, User Info & Logout */}
@@ -158,10 +144,8 @@ export const Header: React.FC<HeaderProps> = ({
                 className="bg-transparent text-xs font-medium text-slate-800 pr-2 pl-1 py-0.5 focus:outline-none cursor-pointer"
               >
                 <option value="en">English</option>
+                <option value="or">ଓଡ଼ିଆ (Odia)</option>
                 <option value="hi">हिन्दी (Hindi)</option>
-                <option value="te">తెలుగు (Telugu)</option>
-                <option value="ta">தமிழ் (Tamil)</option>
-                <option value="mr">मराठी (Marathi)</option>
               </select>
             </div>
 
@@ -169,11 +153,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => setLowDataMode((prev) => !prev)}
               title="Toggle low-bandwidth lightweight mode"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${
-                lowDataMode
-                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                  : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${lowDataMode
+                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                : 'text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
             >
               <WifiOff className="w-3.5 h-3.5" />
               <span className="hidden md:inline">
@@ -184,11 +167,10 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Emergency Siren Trigger Shortcut */}
             <button
               onClick={onOpenEmergencyModal}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                activeEmergency
-                  ? 'bg-red-600 text-white animate-pulse shadow-md'
-                  : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${activeEmergency
+                ? 'bg-red-600 text-white animate-pulse shadow-md'
+                : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                }`}
             >
               <ShieldAlert className="w-4 h-4 text-red-600" />
               <span className="hidden sm:inline">Emergency Siren</span>
@@ -219,13 +201,9 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Mobile persona dropdown */}
             <div className="lg:hidden">
               <select
-                value={activeView === 'adoption' ? 'adoption' : activeRole}
+                value={activeRole}
                 onChange={(e) => {
-                  if (e.target.value === 'adoption') {
-                    onOpenAdoptionPlaybook();
-                  } else {
-                    handleRoleChange(e.target.value as UserRole);
-                  }
+                  handleRoleChange(e.target.value as UserRole);
                 }}
                 aria-label="Mobile Navigation"
                 className="text-xs bg-slate-900 text-white font-medium rounded-md px-2.5 py-1.5 focus:outline-none"
@@ -239,7 +217,6 @@ export const Header: React.FC<HeaderProps> = ({
                 ) : (
                   <option value={activeRole}>{activeRoleLabel}</option>
                 )}
-                <option value="adoption">Rollout Playbook</option>
               </select>
             </div>
           </div>

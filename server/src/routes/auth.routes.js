@@ -14,6 +14,9 @@ router.post('/login', validate(loginSchema, 'body'), authController.login);
 // GET /api/me
 router.get('/me', authenticate, authController.getMe);
 
+// PATCH /api/auth/profile and /api/profile
+router.patch('/profile', authenticate, authController.updateProfile);
+
 // GET /api/auth/staff-requests (Super Admin verification)
 router.get('/staff-requests', authenticate, authController.getStaffRequests);
 

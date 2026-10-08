@@ -16,6 +16,7 @@ import {
   ComplaintPriority,
   ComplaintStatus,
   StaffRegistrationRequest,
+  PassStatus,
 } from '../types';
 import {
   initialGatePasses,
@@ -29,6 +30,7 @@ import {
   initialBroadcasts,
 } from '../data/mockData';
 import { emergencySound } from '../utils/audioAlert';
+import { formatTaskTime, getCurrentFormattedTime } from '../utils/timeFormat';
 import { useAuth } from './AuthContext';
 
 interface CampusOpsContextType {
@@ -214,7 +216,14 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         const parsed: Complaint[] = JSON.parse(saved);
         const filtered = parsed.filter((c) => !isMockPerson(c));
-        if (filtered.length > 0) return filtered;
+        if (filtered.length > 0) {
+          const hasAcademic = filtered.some((c) => c.domain === 'academic' || c.category?.startsWith('academic_'));
+          if (!hasAcademic) {
+            const initialAcademic = initialComplaints.filter((c) => c.domain === 'academic');
+            return [...filtered, ...initialAcademic];
+          }
+          return filtered;
+        }
       } catch {
         return initialComplaints;
       }
@@ -337,7 +346,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch {}
+      } catch { }
     }
     return [
       {
@@ -426,11 +435,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((req) =>
         req.id === id
           ? {
-              ...req,
-              status: 'APPROVED',
-              verifiedAt: timeStr,
-              verificationNotes: notes || 'Verified & approved by Super Admin',
-            }
+            ...req,
+            status: 'APPROVED',
+            verifiedAt: timeStr,
+            verificationNotes: notes || 'Verified & approved by Super Admin',
+          }
           : req
       )
     );
@@ -458,11 +467,11 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((req) =>
         req.id === id
           ? {
-              ...req,
-              status: 'REJECTED',
-              verifiedAt: timeStr,
-              verificationNotes: reason || 'Application rejected by Super Admin',
-            }
+            ...req,
+            status: 'REJECTED',
+            verifiedAt: timeStr,
+            verificationNotes: reason || 'Application rejected by Super Admin',
+          }
           : req
       )
     );
@@ -556,10 +565,34 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     : t.status === 'IN_PROGRESS'
                       ? 'in_progress'
                       : 'open',
-            createdAt: new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            createdAt: t.createdAt ? formatTaskTime(t.createdAt) : 'Just now',
             assignedTo: t.assignedTechId?.fullName || t.assignedTo,
             assignedTrade: t.category,
             assignedBy: t.assignedByName,
+            assignedAt: (() => {
+              const assignedHist = t.statusHistory?.find((h: any) => h.status === 'ASSIGNED');
+              if (assignedHist?.changedAt) {
+                return formatTaskTime(assignedHist.changedAt);
+              }
+              if (t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS' || t.status === 'RESOLVED') {
+                return t.updatedAt ? formatTaskTime(t.updatedAt) : undefined;
+              }
+              return undefined;
+            })(),
+            resolvedAt: t.resolvedAt
+              ? formatTaskTime(t.resolvedAt)
+              : (() => {
+                const resolvedHist = t.statusHistory?.find((h: any) => h.status === 'RESOLVED');
+                return resolvedHist?.changedAt ? formatTaskTime(resolvedHist.changedAt) : undefined;
+              })(),
+            rejectedAt: (() => {
+              const rejectedHist = t.statusHistory?.find((h: any) => h.status === 'REJECTED');
+              return rejectedHist?.changedAt
+                ? formatTaskTime(rejectedHist.changedAt)
+                : t.status === 'REJECTED' && t.updatedAt
+                  ? formatTaskTime(t.updatedAt)
+                  : undefined;
+            })(),
             wardenNotes: t.wardenNotes,
             resolutionNotes: t.resolutionNotes,
             rejectionReason: t.rejectionReason,
@@ -599,6 +632,14 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             expectedInTime: p.expectedReturnTime
               ? new Date(p.expectedReturnTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : '22:30',
+            leaveDate: p.leaveDate,
+            returnDate: p.returnDate,
+            actualOutTime: p.actualExitTime
+              ? new Date(p.actualExitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              : undefined,
+            actualInTime: p.actualReturnTime
+              ? new Date(p.actualReturnTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              : undefined,
             status:
               p.status === 'APPROVED'
                 ? 'approved'
@@ -707,11 +748,20 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   ): Promise<GatePass> => {
     const randomCode = `GP-${Math.floor(1000 + Math.random() * 9000)}`;
     const tempId = `gp-${Date.now()}`;
+    const isDayPass = passData.passType === 'day';
+    const status: PassStatus = isDayPass ? 'approved' : 'pending';
+    const approvedBy = isDayPass ? 'Institutional Day Pass Policy (Auto-Approved)' : undefined;
+    const approvedAt = isDayPass
+      ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : undefined;
+
     let newPass: GatePass = {
       ...passData,
       id: tempId,
       passCode: randomCode,
-      status: 'pending',
+      status,
+      approvedBy,
+      approvedAt,
     };
     setGatePasses((prev) => [newPass, ...prev]);
 
@@ -737,6 +787,8 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             destination: passData.destination,
             requestedExitTime: exitTime,
             expectedReturnTime: returnTime,
+            leaveDate: passData.leaveDate,
+            returnDate: passData.returnDate,
             rollNumber: passData.rollNumber,
             studentName: passData.studentName,
             phoneNumber: passData.parentPhone,
@@ -755,7 +807,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             qrIssuedAt: data.data.qrIssuedAt,
             qrExpiresAt: data.data.qrExpiresAt,
             issueCount: data.data.issueCount || 1,
-            status: data.data.status?.toLowerCase() === 'approved' ? 'approved' : 'pending',
+            status: isDayPass ? 'approved' : (data.data.status?.toLowerCase() === 'approved' ? 'approved' : 'pending'),
           };
           setGatePasses((prev) =>
             prev.map((p) => (p.id === tempId ? newPass : p)),
@@ -887,24 +939,84 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const logGateExit = (passCode: string) => {
-    const cleanCode = passCode.trim().toUpperCase();
-    const pass = gatePasses.find(
-      (p) => p.passCode.toUpperCase() === cleanCode || p.qrCode?.toUpperCase() === cleanCode,
+    const raw = (passCode || '').trim();
+    const cleanCode = raw.toUpperCase();
+
+    let rollToMatch = cleanCode;
+    let studentName = '';
+    let hostel = 'Hostel A';
+    let room = '101';
+
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.rollNumber) rollToMatch = parsed.rollNumber.toUpperCase();
+        if (parsed.studentName || parsed.name) studentName = parsed.studentName || parsed.name;
+        if (parsed.roomNumber || parsed.room) room = parsed.roomNumber || parsed.room;
+        if (parsed.hostelBlock || parsed.hostel) hostel = parsed.hostelBlock || parsed.hostel;
+      } catch { }
+    } else if (cleanCode.startsWith('PERM-')) {
+      rollToMatch = cleanCode.replace('PERM-', '');
+    } else if (raw.includes(':')) {
+      const parts = raw.split(':');
+      if (parts.length >= 3) {
+        rollToMatch = parts[2].toUpperCase();
+        if (parts[3]) studentName = parts[3];
+        if (parts[4]) hostel = parts[4];
+        if (parts[5]) room = parts[5];
+      }
+    }
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const existingPass = gatePasses.find(
+      (p) =>
+        p.id === raw ||
+        p.passCode.toUpperCase() === cleanCode ||
+        p.qrCode?.toUpperCase() === cleanCode ||
+        p.qrToken?.toUpperCase() === cleanCode ||
+        p.rollNumber.toUpperCase() === rollToMatch ||
+        p.rollNumber.toUpperCase() === cleanCode,
     );
 
-    if (!pass) {
-      return { success: false, message: `Gate pass code ${passCode} not found in database.` };
-    }
-    if (pass.status !== 'approved') {
-      return { success: false, message: `Pass is currently ${pass.status.toUpperCase()} and cannot be used for exit.` };
-    }
+    let updatedPass: GatePass;
 
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const updatedPass: GatePass = { ...pass, status: 'checked_out', actualOutTime: timeStr };
-
-    setGatePasses((prev) =>
-      prev.map((p) => (p.id === pass.id ? updatedPass : p)),
-    );
+    if (existingPass) {
+      updatedPass = {
+        ...existingPass,
+        status: 'checked_out',
+        actualOutTime: timeStr,
+        clearedAt: now.getTime(),
+      };
+      setGatePasses((prev) =>
+        prev.map((p) => (p.id === existingPass.id ? updatedPass : p)),
+      );
+    } else {
+      // Dynamic Day Pass clearance with student's permanent admission pass
+      const matchedRoster = rollCallRecords.find((r) => r.rollNumber.toUpperCase() === rollToMatch);
+      updatedPass = {
+        id: `gp-perm-${Date.now()}`,
+        passCode: `DP-${rollToMatch.slice(-4) || '9090'}`,
+        studentName: studentName || matchedRoster?.name || `Student (${rollToMatch})`,
+        rollNumber: rollToMatch,
+        roomNumber: room || matchedRoster?.room || '101',
+        hostelBlock: hostel || matchedRoster?.block || 'Hostel A',
+        passType: 'day',
+        purpose: 'Daily Campus Outing (Permanent Day Pass)',
+        destination: 'Campus Vicinity / City',
+        outTime: timeStr,
+        expectedInTime: '22:30',
+        actualOutTime: timeStr,
+        clearedAt: now.getTime(),
+        status: 'checked_out',
+        parentConsentVerified: true,
+        parentPhone: '+91 98451 22910',
+        approvedBy: 'Institutional Permanent Day Pass',
+        isPermanentPass: true,
+      };
+      setGatePasses((prev) => [updatedPass, ...prev]);
+    }
 
     // Sync to backend DB
     const token = localStorage.getItem('token');
@@ -915,38 +1027,117 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ scanData: cleanCode }),
+        body: JSON.stringify({ scanData: updatedPass.qrCode || updatedPass.passCode || cleanCode }),
       }).catch(console.warn);
     }
 
     // Update Roll call roster
     setRollCallRecords((prev) =>
       prev.map((r) =>
-        r.rollNumber === pass.rollNumber
-          ? { ...r, status: 'on_gate_pass', lastSeenTime: `${timeStr} (Main Gate Exit)` }
+        r.rollNumber.toUpperCase() === updatedPass.rollNumber.toUpperCase()
+          ? { ...r, status: 'on_gate_pass', lastSeenTime: `${timeStr} (Main Gate Out)` }
           : r,
       ),
     );
 
-    return { success: true, message: `Exit verified for ${pass.studentName} (${pass.rollNumber}). Expected return: ${pass.expectedInTime}`, pass: updatedPass };
+    return {
+      success: true,
+      message: `Exit verified for ${updatedPass.studentName} (${updatedPass.rollNumber}) at ${timeStr}. Out time registered.`,
+      pass: updatedPass,
+    };
   };
 
   const logGateEntry = (passCode: string) => {
-    const cleanCode = passCode.trim().toUpperCase();
-    const pass = gatePasses.find(
-      (p) => p.passCode.toUpperCase() === cleanCode || p.qrCode?.toUpperCase() === cleanCode,
-    );
+    const raw = (passCode || '').trim();
+    const cleanCode = raw.toUpperCase();
 
-    if (!pass) {
-      return { success: false, message: `Pass code ${passCode} not found.` };
+    let rollToMatch = cleanCode;
+    let studentName = '';
+    let hostel = 'Hostel A';
+    let room = '101';
+
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.rollNumber) rollToMatch = parsed.rollNumber.toUpperCase();
+        if (parsed.studentName || parsed.name) studentName = parsed.studentName || parsed.name;
+        if (parsed.roomNumber || parsed.room) room = parsed.roomNumber || parsed.room;
+        if (parsed.hostelBlock || parsed.hostel) hostel = parsed.hostelBlock || parsed.hostel;
+      } catch { }
+    } else if (cleanCode.startsWith('PERM-')) {
+      rollToMatch = cleanCode.replace('PERM-', '');
+    } else if (raw.includes(':')) {
+      const parts = raw.split(':');
+      if (parts.length >= 3) {
+        rollToMatch = parts[2].toUpperCase();
+        if (parts[3]) studentName = parts[3];
+        if (parts[4]) hostel = parts[4];
+        if (parts[5]) room = parts[5];
+      }
     }
 
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const updatedPass: GatePass = { ...pass, status: 'completed', actualInTime: timeStr };
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    setGatePasses((prev) =>
-      prev.map((p) => (p.id === pass.id ? updatedPass : p)),
+    // Look for active/checked_out pass first
+    const existingPass = gatePasses.find(
+      (p) =>
+        (p.id === raw ||
+          p.passCode.toUpperCase() === cleanCode ||
+          p.qrCode?.toUpperCase() === cleanCode ||
+          p.qrToken?.toUpperCase() === cleanCode ||
+          p.rollNumber.toUpperCase() === rollToMatch ||
+          p.rollNumber.toUpperCase() === cleanCode) &&
+        p.status === 'checked_out',
+    ) || gatePasses.find(
+      (p) =>
+        p.id === raw ||
+        p.passCode.toUpperCase() === cleanCode ||
+        p.qrCode?.toUpperCase() === cleanCode ||
+        p.qrToken?.toUpperCase() === cleanCode ||
+        p.rollNumber.toUpperCase() === rollToMatch ||
+        p.rollNumber.toUpperCase() === cleanCode,
     );
+
+    let updatedPass: GatePass;
+
+    if (existingPass) {
+      updatedPass = {
+        ...existingPass,
+        status: 'completed',
+        actualInTime: timeStr,
+        actualOutTime: existingPass.actualOutTime || existingPass.outTime || timeStr,
+        clearedAt: now.getTime(),
+      };
+      setGatePasses((prev) =>
+        prev.map((p) => (p.id === existingPass.id ? updatedPass : p)),
+      );
+    } else {
+      // Dynamic safe entry clearance with student's permanent admission pass
+      const matchedRoster = rollCallRecords.find((r) => r.rollNumber.toUpperCase() === rollToMatch);
+      updatedPass = {
+        id: `gp-perm-${Date.now()}`,
+        passCode: `DP-${rollToMatch.slice(-4) || '9090'}`,
+        studentName: studentName || matchedRoster?.name || `Student (${rollToMatch})`,
+        rollNumber: rollToMatch,
+        roomNumber: room || matchedRoster?.room || '101',
+        hostelBlock: hostel || matchedRoster?.block || 'Hostel A',
+        passType: 'day',
+        purpose: 'Daily Campus Entry (Permanent Day Pass)',
+        destination: 'Campus',
+        outTime: timeStr,
+        expectedInTime: '22:30',
+        actualOutTime: timeStr,
+        actualInTime: timeStr,
+        clearedAt: now.getTime(),
+        status: 'completed',
+        parentConsentVerified: true,
+        parentPhone: '+91 98451 22910',
+        approvedBy: 'Institutional Permanent Day Pass',
+        isPermanentPass: true,
+      };
+      setGatePasses((prev) => [updatedPass, ...prev]);
+    }
 
     // Sync to backend DB
     const token = localStorage.getItem('token');
@@ -957,20 +1148,24 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ scanData: cleanCode }),
+        body: JSON.stringify({ scanData: updatedPass.qrCode || updatedPass.passCode || cleanCode }),
       }).catch(console.warn);
     }
 
-    // Update Roll call
+    // Update Roll call roster
     setRollCallRecords((prev) =>
       prev.map((r) =>
-        r.rollNumber === pass.rollNumber
-          ? { ...r, status: 'inside', lastSeenTime: `${timeStr} (Returned to Hostel)` }
+        r.rollNumber.toUpperCase() === updatedPass.rollNumber.toUpperCase()
+          ? { ...r, status: 'inside', lastSeenTime: `${timeStr} (Returned to Campus)` }
           : r,
       ),
     );
 
-    return { success: true, message: `Safe return logged for ${pass.studentName}. Pass completed.`, pass: updatedPass };
+    return {
+      success: true,
+      message: `Safe return logged for ${updatedPass.studentName} (${updatedPass.rollNumber}) at ${timeStr}. In time registered.`,
+      pass: updatedPass,
+    };
   };
 
   // Complaint Creation with Intelligent Deduplication
@@ -979,7 +1174,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   ): Complaint => {
     const newId = `tc-${Date.now()}`;
     const ticketNumber = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
 
     // Check if an existing deduplicated ticket exists for this category & block
     const matchingMaster = deduplicatedTickets.find(
@@ -1033,10 +1228,22 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       );
     }
 
+    const isAcademic =
+      data.domain === 'academic' ||
+      data.category?.startsWith('academic_') ||
+      (data.hostelBlock && data.hostelBlock.toLowerCase().includes('academic')) ||
+      (data.roomNumber && (data.roomNumber.toLowerCase().includes('lab') || data.roomNumber.toLowerCase().includes('hall') || data.roomNumber.toLowerCase().includes('classroom')));
+
+    const finalDomain: 'academic' | 'hostel' = data.domain || (isAcademic ? 'academic' : 'hostel');
+    const finalTicketNumber = isAcademic
+      ? `ACAD-${Math.floor(1000 + Math.random() * 9000)}`
+      : `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newTicket: Complaint = {
       ...data,
+      domain: finalDomain,
       id: newId,
-      ticketNumber,
+      ticketNumber: finalTicketNumber,
       status: 'open',
       createdAt: timeStr,
       upvotes: 1,
@@ -1085,21 +1292,21 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     priority?: ComplaintPriority,
     assignedBy: string = 'Hostel Warden',
   ) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
           ? {
-              ...c,
-              category: category || c.category,
-              assignedTrade: category ? getTradeName(category) : c.assignedTrade || getTradeName(c.category),
-              assignedTo: techName,
-              assignedBy,
-              assignedAt: timeStr,
-              wardenNotes: wardenNotes !== undefined ? wardenNotes : c.wardenNotes,
-              priority: priority || c.priority,
-              status: 'assigned',
-            }
+            ...c,
+            category: category || c.category,
+            assignedTrade: category ? getTradeName(category) : c.assignedTrade || getTradeName(c.category),
+            assignedTo: techName,
+            assignedBy,
+            assignedAt: timeStr,
+            wardenNotes: wardenNotes !== undefined ? wardenNotes : c.wardenNotes,
+            priority: priority || c.priority,
+            status: 'assigned',
+          }
           : c,
       ),
     );
@@ -1123,17 +1330,17 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const resolveComplaint = async (id: string, notes: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
           ? {
-              ...c,
-              status: 'resolved',
-              resolvedAt: timeStr,
-              resolvedBy: techName || c.assignedTo || 'Duty Technician',
-              resolutionNotes: notes,
-            }
+            ...c,
+            status: 'resolved',
+            resolvedAt: timeStr,
+            resolvedBy: techName || c.assignedTo || 'Duty Technician',
+            resolutionNotes: notes,
+          }
           : c,
       ),
     );
@@ -1152,17 +1359,17 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const rejectComplaint = async (id: string, reason: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
           ? {
-              ...c,
-              status: 'rejected',
-              rejectedAt: timeStr,
-              rejectedBy: techName || c.assignedTo || 'Duty Technician',
-              rejectionReason: reason,
-            }
+            ...c,
+            status: 'rejected',
+            rejectedAt: timeStr,
+            rejectedBy: techName || c.assignedTo || 'Duty Technician',
+            rejectionReason: reason,
+          }
           : c,
       ),
     );
@@ -1185,16 +1392,16 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((c) =>
         c.id === id
           ? {
-              ...c,
-              status: 'open',
-              wardenNotes: notes ? `[Reopened] ${notes}` : c.wardenNotes,
-              rejectionReason: undefined,
-              rejectedAt: undefined,
-              rejectedBy: undefined,
-              resolvedAt: undefined,
-              resolvedBy: undefined,
-              resolutionNotes: undefined,
-            }
+            ...c,
+            status: 'open',
+            wardenNotes: notes ? `[Reopened] ${notes}` : c.wardenNotes,
+            rejectionReason: undefined,
+            rejectedAt: undefined,
+            rejectedBy: undefined,
+            resolvedAt: undefined,
+            resolvedBy: undefined,
+            resolutionNotes: undefined,
+          }
           : c,
       ),
     );
@@ -1213,7 +1420,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const resolveDeduplicatedTicket = (masterId: string, notes: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     const target = deduplicatedTickets.find((d) => d.id === masterId);
     if (!target) return;
 
@@ -1226,19 +1433,19 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((c) =>
         c.masterTicketId === masterId || target.complaintIds.includes(c.id)
           ? {
-              ...c,
-              status: 'resolved',
-              resolvedAt: timeStr,
-              resolvedBy: techName || target.assignedTechnician,
-              resolutionNotes: `[Group Resolution ${target.masterCode}] ${notes}`,
-            }
+            ...c,
+            status: 'resolved',
+            resolvedAt: timeStr,
+            resolvedBy: techName || target.assignedTechnician,
+            resolutionNotes: `[Group Resolution ${target.masterCode}] ${notes}`,
+          }
           : c,
       ),
     );
   };
 
   const rejectDeduplicatedTicket = (masterId: string, reason: string, techName?: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     const target = deduplicatedTickets.find((d) => d.id === masterId);
     if (!target) return;
 
@@ -1251,12 +1458,12 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       prev.map((c) =>
         c.masterTicketId === masterId || target.complaintIds.includes(c.id)
           ? {
-              ...c,
-              status: 'rejected',
-              rejectedAt: timeStr,
-              rejectedBy: techName || target.assignedTechnician,
-              rejectionReason: `[Cluster Review ${target.masterCode}] ${reason}`,
-            }
+            ...c,
+            status: 'rejected',
+            rejectedAt: timeStr,
+            rejectedBy: techName || target.assignedTechnician,
+            rejectionReason: `[Cluster Review ${target.masterCode}] ${reason}`,
+          }
           : c,
       ),
     );
@@ -1270,7 +1477,7 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Simulate Surge Outage (Demonstration helper for hackathon & client PRD)
   const simulateOutageSurge = () => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = getCurrentFormattedTime();
     const sampleRooms = ['402', '405', '409', '414', '418', '422'];
     const newMasterCode = `DT-WIFI-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -1582,8 +1789,8 @@ export const CampusOpsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     setActiveEmergency(alert);
 
-    // Play loud 3-second ambulance siren even if muted!
-    emergencySound.playAmbulanceSiren(3);
+    // Play loud 6-second ambulance siren even if muted!
+    emergencySound.playAmbulanceSiren(6);
   };
 
   const dismissEmergencyAlert = () => {
@@ -1699,6 +1906,20 @@ function getTradeName(cat: ComplaintCategory): string {
       return 'Housekeeping';
     case 'ac':
       return 'HVAC / Cooling';
+    case 'academic_lab':
+      return 'Lab & Workstations';
+    case 'academic_exam':
+      return 'Exam & Marks Evaluation';
+    case 'academic_faculty':
+      return 'Academic Curriculum';
+    case 'academic_notes':
+      return 'Course Materials';
+    case 'academic_attendance':
+      return 'Academic Attendance';
+    case 'academic_library':
+      return 'Library & Computing';
+    default:
+      return 'General Department';
   }
 }
 
@@ -1716,5 +1937,19 @@ function getTechnicianForCategory(cat: ComplaintCategory): string {
       return 'Radha Bai (Sanitation Supervisor)';
     case 'ac':
       return 'Manoj Verma (HVAC Tech)';
+    case 'academic_lab':
+      return 'Systems Lab Administrator';
+    case 'academic_exam':
+      return 'Controller of Examinations Rep';
+    case 'academic_faculty':
+      return 'Department Faculty Advisor';
+    case 'academic_notes':
+      return 'Course Coordinator';
+    case 'academic_attendance':
+      return 'Academic Registrar Staff';
+    case 'academic_library':
+      return 'Digital Library Coordinator';
+    default:
+      return 'Department Staff';
   }
 }

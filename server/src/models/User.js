@@ -37,11 +37,35 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  department: {
+    type: String,
+    trim: true,
+    default: 'Computer Science & Engineering',
+  },
+  cabin: {
+    type: String,
+    trim: true,
+    default: 'Academic Block B, Room 304',
+  },
+  officeHours: {
+    type: String,
+    trim: true,
+    default: 'Mon-Fri 02:00 PM - 04:30 PM',
+  },
+  bio: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   offerLetter: {
-    type: String, // Stream URL (/api/files/:id) or Base64 data URI
+    type: String, // Supabase public URL or document URI
+  },
+  offerLetterPath: {
+    type: String, // Supabase Storage object path (e.g. offer-letters/...)
+    trim: true,
   },
   offerLetterFileId: {
-    type: mongoose.Schema.Types.ObjectId, // MongoDB GridFS ObjectId
+    type: mongoose.Schema.Types.Mixed, // Legacy fallback
   },
   offerLetterFilename: {
     type: String,

@@ -2,8 +2,7 @@ const User = require('../models/User');
 const jwt = require('../utils/jwt');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { registerSchema } = require('../validators/auth.schema');
-const { uploadBase64ToGridFS } = require('../services/gridfs.service');
+const { uploadBase64ToSupabase } = require('../services/supabase.service');
 
 /**
  * @desc    Authenticate user & get token
@@ -19,7 +18,7 @@ const login = asyncHandler(async (req, res) => {
   }
 
   // Find user by phone number
-  const user = await User.findOne({ phoneNumber }).populate('locationId');
+  const user = await User.findOne({ phoneNumber: trimmedPhone }).populate('locationId');
 
   if (!user) {
     throw new ApiError(401, 'Invalid credentials');
@@ -32,13 +31,76 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(401, 'Invalid credentials');
   }
 
-  // Check verification status for staff accounts
+  // Check verification status for staff accounts (auto-activate FACULTY & HOD)
   if (user.status === 'PENDING') {
-    throw new ApiError(403, 'Your staff registration is pending Super Admin verification. You will be able to sign in once approved.');
+    if (user.role === 'FACULTY' || user.role === 'HOD') {
+      user.status = 'ACTIVE';
+      await user.save();
+    } else {
+      throw new ApiError(403, 'Your staff registration is pending Super Admin verification. You will be able to sign in once approved.');
+    }
   }
 
   if (user.status === 'REJECTED') {
     throw new ApiError(403, 'Your staff registration request has been rejected by the Super Admin.');
+  }
+
+  // Validate that user's assigned role matches the role selected on login page
+  if (req.body.role) {
+    const roleNormalized = String(req.body.role).toLowerCase();
+    let userFrontendRole = 'student';
+    switch (user.role?.toUpperCase()) {
+      case 'STUDENT':
+        userFrontendRole = 'student';
+        break;
+      case 'WARDEN':
+        userFrontendRole = 'warden';
+        break;
+      case 'TECHNICIAN':
+        userFrontendRole = 'technician';
+        break;
+      case 'SECURITY':
+      case 'GUARD':
+        userFrontendRole = 'guard';
+        break;
+      case 'MESS':
+        userFrontendRole = 'mess';
+        break;
+      case 'KIOSK':
+        userFrontendRole = 'kiosk';
+        break;
+      case 'ADMIN':
+        userFrontendRole = 'admin';
+        break;
+      case 'FACULTY':
+      case 'HOD':
+      case 'EXAM_CELL':
+      case 'ACCOUNTS':
+        userFrontendRole = 'faculty';
+        break;
+      default:
+        userFrontendRole = 'student';
+    }
+
+    if (roleNormalized !== userFrontendRole) {
+      const roleDisplayNames = {
+        student: 'Student',
+        faculty: 'Faculty / Staff',
+        warden: 'Hostel Warden',
+        guard: 'Security Guard',
+        admin: 'Campus Admin',
+        technician: 'Maintenance Tech',
+        mess: 'Mess Manager',
+        kiosk: 'Self-Service Kiosk',
+      };
+      const actualName = roleDisplayNames[userFrontendRole] || userFrontendRole;
+      const requestedName = roleDisplayNames[roleNormalized] || roleNormalized;
+      return res.status(400).json({
+        success: false,
+        message: `Role mismatch: This account is registered as "${actualName}", not "${requestedName}". Please select "${actualName}" to sign in.`,
+        correctRole: userFrontendRole,
+      });
+    }
   }
 
   // Generate token
@@ -54,6 +116,10 @@ const login = asyncHandler(async (req, res) => {
     designation: user.designation || '',
     employeeId: user.employeeId || '',
     status: user.status || 'ACTIVE',
+    department: user.department || 'Computer Science & Engineering',
+    cabin: user.cabin || 'Academic Block B, Room 304',
+    officeHours: user.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+    bio: user.bio || '',
     hostel: user.hostel || user.locationId?.buildingName || '',
     roomNumber: user.roomNumber || user.locationId?.roomNumber || '',
     batch: user.batch || ''
@@ -86,11 +152,16 @@ const register = asyncHandler(async (req, res) => {
     designation,
     employeeId,
     offerLetter,
+    offerLetterName,
     locationId,
     hostel,
     roomNumber,
     batch,
-    shifts
+    shifts,
+    department,
+    cabin,
+    officeHours,
+    bio,
   } = req.body;
 
   const trimmedPhone = typeof phoneNumber === 'string' ? phoneNumber.trim() : '';
@@ -104,14 +175,14 @@ const register = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'User with this phone number already exists');
   }
 
-  // Check if staff registration needs pending verification
-  const isStaffRole = !['STUDENT', 'ADMIN', 'KIOSK'].includes(role);
+  // Check if staff registration needs pending verification (Faculty & HOD accounts are immediately active)
+  const isStaffRole = !['STUDENT', 'ADMIN', 'FACULTY', 'HOD'].includes(role);
   const initialStatus = isStaffRole ? 'PENDING' : 'ACTIVE';
 
   // Create user object
   const userData = {
     fullName,
-    phoneNumber,
+    phoneNumber: trimmedPhone,
     passwordHash: password, // Will be hashed by pre-save hook
     role,
     status: initialStatus,
@@ -120,26 +191,43 @@ const register = asyncHandler(async (req, res) => {
   if (email) userData.email = email.trim().toLowerCase();
   if (designation) userData.designation = designation.trim();
   if (employeeId) userData.employeeId = employeeId.trim();
+  if (department) userData.department = department.trim();
+  if (cabin) userData.cabin = cabin.trim();
+  if (officeHours) userData.officeHours = officeHours.trim();
+  if (bio) userData.bio = bio.trim();
 
-  // If offer letter is provided, upload directly into MongoDB GridFS
+  // If offer letter is provided, upload directly into Supabase Storage
   if (offerLetter) {
     if (typeof offerLetter === 'string' && (offerLetter.startsWith('data:') || offerLetter.length > 200)) {
       try {
-        const cleanFilename = `${(fullName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_')}_Offer_Letter.pdf`;
-        const gridfsFile = await uploadBase64ToGridFS(cleanFilename, offerLetter, {
+        let ext = '.pdf';
+        if (offerLetter.startsWith('data:image/png')) ext = '.png';
+        else if (offerLetter.startsWith('data:image/jpeg') || offerLetter.startsWith('data:image/jpg')) ext = '.jpg';
+        else if (offerLetterName && offerLetterName.includes('.')) {
+          ext = '.' + offerLetterName.split('.').pop();
+        }
+
+        const safePrefix = (fullName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_');
+        const cleanFilename = offerLetterName
+          ? offerLetterName.replace(/[^a-zA-Z0-9._-]/g, '_')
+          : `${safePrefix}_Offer_Letter${ext}`;
+
+        const supabaseFile = await uploadBase64ToSupabase(cleanFilename, offerLetter, {
           candidateName: fullName,
           phoneNumber: trimmedPhone,
           employeeId: employeeId || '',
           role,
         });
 
-        userData.offerLetterFileId = gridfsFile.fileId;
-        userData.offerLetter = `/api/files/${gridfsFile.fileId}`;
-        userData.offerLetterFilename = gridfsFile.filename;
-        userData.offerLetterContentType = gridfsFile.contentType;
-        userData.offerLetterSize = gridfsFile.length;
-      } catch (gridfsErr) {
-        console.warn('GridFS storage warning (falling back to direct URI):', gridfsErr.message);
+        // Store direct public URL from Supabase
+        userData.offerLetter = supabaseFile.publicUrl;
+        userData.offerLetterPath = supabaseFile.path;
+        userData.offerLetterFilename = supabaseFile.filename;
+        userData.offerLetterContentType = supabaseFile.contentType;
+        userData.offerLetterSize = supabaseFile.size;
+        console.log(`Document successfully uploaded to Supabase Storage: ${supabaseFile.publicUrl}`);
+      } catch (uploadErr) {
+        console.error('Supabase storage upload error:', uploadErr.message);
         userData.offerLetter = offerLetter;
       }
     } else {
@@ -172,6 +260,9 @@ const register = asyncHandler(async (req, res) => {
     designation: user.designation || '',
     employeeId: user.employeeId || '',
     status: user.status,
+    offerLetter: user.offerLetter || '',
+    offerLetterUrl: user.offerLetter || '',
+    offerLetterName: user.offerLetterFilename || `${user.fullName.replace(/\s+/g, '_')}_Offer_Letter.pdf`,
     hostel: user.hostel || populatedUser?.locationId?.buildingName || '',
     roomNumber: user.roomNumber || populatedUser?.locationId?.roomNumber || '',
     batch: user.batch || ''
@@ -211,19 +302,81 @@ const register = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const getMe = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).populate('locationId');
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
   res.json({
     success: true,
     data: {
       user: {
-        id: req.user._id,
-        fullName: req.user.fullName,
-        role: req.user.role,
-        phoneNumber: req.user.phoneNumber,
-        hostel: req.user.hostel || req.user.locationId?.buildingName || '',
-        roomNumber: req.user.roomNumber || req.user.locationId?.roomNumber || '',
-        batch: req.user.batch || ''
+        id: user._id,
+        fullName: user.fullName,
+        role: user.role,
+        phoneNumber: user.phoneNumber,
+        email: user.email || '',
+        designation: user.designation || '',
+        employeeId: user.employeeId || '',
+        department: user.department || 'Computer Science & Engineering',
+        cabin: user.cabin || 'Academic Block B, Room 304',
+        officeHours: user.officeHours || 'Mon-Fri 02:00 PM - 04:30 PM',
+        bio: user.bio || '',
+        status: user.status || 'ACTIVE',
+        hostel: user.hostel || user.locationId?.buildingName || '',
+        roomNumber: user.roomNumber || user.locationId?.roomNumber || '',
+        batch: user.batch || ''
       }
     }
+  });
+});
+
+/**
+ * @desc    Update user profile (Faculty, Staff, Student)
+ * @route   PATCH /api/auth/profile
+ * @access  Private
+ */
+const updateProfile = asyncHandler(async (req, res) => {
+  const { fullName, email, designation, department, cabin, officeHours, bio } = req.body;
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  if (fullName !== undefined) user.fullName = fullName.trim();
+  if (email !== undefined) user.email = email.trim().toLowerCase();
+  if (designation !== undefined) user.designation = designation.trim();
+  if (department !== undefined) user.department = department.trim();
+  if (cabin !== undefined) user.cabin = cabin.trim();
+  if (officeHours !== undefined) user.officeHours = officeHours.trim();
+  if (bio !== undefined) user.bio = bio.trim();
+
+  await user.save();
+
+  const responseUser = {
+    id: user._id,
+    fullName: user.fullName,
+    role: user.role,
+    phoneNumber: user.phoneNumber,
+    email: user.email || '',
+    designation: user.designation || '',
+    employeeId: user.employeeId || '',
+    department: user.department || '',
+    cabin: user.cabin || '',
+    officeHours: user.officeHours || '',
+    bio: user.bio || '',
+    status: user.status || 'ACTIVE',
+    hostel: user.hostel || '',
+    roomNumber: user.roomNumber || '',
+    batch: user.batch || ''
+  };
+
+  res.json({
+    success: true,
+    message: 'Profile updated successfully',
+    data: { user: responseUser },
+    user: responseUser
   });
 });
 
@@ -273,7 +426,7 @@ const getStaffRequests = asyncHandler(async (req, res) => {
   const filter = {
     $or: [
       { employeeId: { $exists: true, $ne: '' } },
-      { role: { $in: ['FACULTY', 'HOD', 'ACCOUNTS', 'EXAM_CELL', 'WARDEN', 'MESS', 'TECHNICIAN', 'SECURITY'] } }
+      { role: { $in: ['FACULTY', 'HOD', 'ACCOUNTS', 'EXAM_CELL', 'WARDEN', 'MESS', 'TECHNICIAN', 'SECURITY', 'KIOSK'] } }
     ]
   };
 
@@ -288,23 +441,36 @@ const getStaffRequests = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     count: requests.length,
-    data: requests.map((u) => ({
-      id: u._id.toString(),
-      fullName: u.fullName,
-      email: u.email || '',
-      phoneNumber: u.phoneNumber,
-      role: u.role,
-      designation: u.designation || '',
-      employeeId: u.employeeId || '',
-      offerLetter: u.offerLetter || (u.offerLetterFileId ? `/api/files/${u.offerLetterFileId}` : ''),
-      offerLetterName: u.offerLetterFilename || `${u.fullName.replace(/\s+/g, '_')}_Offer_Letter.pdf`,
-      offerLetterFileId: u.offerLetterFileId ? u.offerLetterFileId.toString() : null,
-      status: u.status || 'PENDING',
-      verificationNotes: u.verificationNotes || '',
-      verifiedAt: u.verifiedAt,
-      verifiedBy: u.verifiedBy?.fullName,
-      createdAt: u.createdAt,
-    }))
+    data: requests.map((u) => {
+      let docUrl = u.offerLetter || '';
+      if (!docUrl && u.offerLetterFileId) {
+        docUrl = `/api/files/${u.offerLetterFileId.toString()}`;
+      } else if (!docUrl) {
+        docUrl = `/api/files/${u._id.toString()}`;
+      }
+
+      return {
+        id: u._id.toString(),
+        fullName: u.fullName,
+        email: u.email || '',
+        phoneNumber: u.phoneNumber,
+        role: u.role,
+        designation: u.designation || '',
+        employeeId: u.employeeId || '',
+        offerLetter: docUrl,
+        offerLetterUrl: docUrl,
+        offerLetterName: u.offerLetterFilename || `${u.fullName.replace(/\s+/g, '_')}_Offer_Letter.pdf`,
+        offerLetterPath: u.offerLetterPath || '',
+        offerLetterContentType: u.offerLetterContentType || 'application/pdf',
+        offerLetterSize: u.offerLetterSize || 0,
+        offerLetterFileId: u.offerLetterFileId ? u.offerLetterFileId.toString() : null,
+        status: u.status || 'PENDING',
+        verificationNotes: u.verificationNotes || '',
+        verifiedAt: u.verifiedAt,
+        verifiedBy: u.verifiedBy?.fullName,
+        createdAt: u.createdAt,
+      };
+    })
   });
 });
 
@@ -351,6 +517,7 @@ module.exports = {
   login,
   register,
   getMe,
+  updateProfile,
   updateRoom,
   getStaffRequests,
   verifyStaffRequest
