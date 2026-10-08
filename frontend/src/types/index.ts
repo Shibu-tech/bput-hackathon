@@ -64,6 +64,7 @@ export interface Complaint {
   photoUrl?: string;
   masterTicketId?: string; // If grouped into deduplicated issue
   upvotes: number;
+  aiSummary?: string;
 }
 
 export interface DeduplicatedTicket {

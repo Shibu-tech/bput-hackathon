@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -15,6 +15,8 @@ const {
   pushRoutes,
   locationRoutes,
   fileRoutes,
+  aiRoutes,
+  messageRoutes,
 } = require('./routes');
 
 const app = express();
@@ -54,6 +56,8 @@ app.use('/api/mess', messRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/messages', messageRoutes);
 
 // 404 handler
 app.use(notFound);

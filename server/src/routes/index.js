@@ -1,4 +1,4 @@
-const authRoutes = require('./auth.routes');
+﻿const authRoutes = require('./auth.routes');
 const ticketRoutes = require('./ticket.routes');
 const gatePassRoutes = require('./gatePass.routes');
 const noticeRoutes = require('./notice.routes');
@@ -7,6 +7,8 @@ const attendanceRoutes = require('./attendance.routes');
 const pushRoutes = require('./push.routes');
 const locationRoutes = require('./location.routes');
 const fileRoutes = require('./file.routes');
+const aiRoutes = require('./ai.routes');
+const messageRoutes = require('./message.routes');
 
 module.exports = {
   authRoutes,
@@ -18,4 +20,6 @@ module.exports = {
   pushRoutes,
   locationRoutes,
   fileRoutes,
+  aiRoutes,
+  messageRoutes
 };

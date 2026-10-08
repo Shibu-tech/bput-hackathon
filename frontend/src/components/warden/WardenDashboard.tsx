@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { useAuth } from '../../context/AuthContext';
 import { translations } from '../../utils/translations';
@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import campusAerialImg from '../../assets/images/campus_hostel_aerial_1790190005312.jpg';
 import { WardenAnalyticsView } from './WardenAnalyticsView';
+import { HostelCareWardenPortal } from './HostelCareWardenPortal';
 
 export const WardenDashboard: React.FC = () => {
   const {
@@ -183,14 +184,14 @@ export const WardenDashboard: React.FC = () => {
               <span className="text-2xs uppercase tracking-widest text-indigo-400 font-semibold">
                 Central Administrative Control
               </span>
-              <span className="text-slate-400 text-xs">·</span>
+              <span className="text-slate-400 text-xs">Â·</span>
               <span className="text-xs text-slate-300">{wardenDisplayName} (Hostel Warden)</span>
             </div>
             <h1 className="text-xl font-bold text-white mt-1">
               Hostel Life Operations & Student Safety Dashboard
             </h1>
             <p className="text-xs text-slate-300 mt-0.5">
-              Zero physical registers · Automated night roll call · Real-time workload & resolution metrics
+              Zero physical registers Â· Automated night roll call Â· Real-time workload & resolution metrics
             </p>
           </div>
 
@@ -256,7 +257,7 @@ export const WardenDashboard: React.FC = () => {
         {[
           { id: 'rollcall', label: '10:30 PM Night Roll Call', count: overdueCount > 0 ? overdueCount : undefined },
           { id: 'approvals', label: 'Pending Gate Passes', count: pendingPasses.length },
-          { id: 'workload', label: 'Task Dispatch & Review Desk', count: complaints.filter(c => c.status === 'open' || c.status === 'rejected').length || undefined },
+          { id: 'workload', label: 'Hostel Complaints & AI Overview', count: complaints.filter(c => c.status === 'open' || c.status === 'rejected').length || undefined },
           { id: 'analytics', label: 'Real-Time Trends & Analytics' },
           { id: 'broadcast', label: 'Targeted Circulars & WhatsApp Replacement' },
         ].map((tab) => (
@@ -357,7 +358,7 @@ export const WardenDashboard: React.FC = () => {
                           {r.name}
                         </td>
                         <td className="py-3 text-slate-600">
-                          Room {r.room} · {r.block}
+                          Room {r.room} Â· {r.block}
                         </td>
                         <td className="py-3">
                           <span
@@ -434,14 +435,14 @@ export const WardenDashboard: React.FC = () => {
                       </span>
                     </div>
                     <span className="text-xs text-slate-500 font-mono">
-                      Out: {pass.outTime} → In: {pass.expectedInTime}
+                      Out: {pass.outTime} â†’ In: {pass.expectedInTime}
                     </span>
                   </div>
 
                   <div>
                     <div className="text-sm font-bold text-slate-900">{pass.studentName}</div>
                     <div className="text-xs text-slate-500">
-                      {pass.rollNumber} · Room {pass.roomNumber} ({pass.hostelBlock})
+                      {pass.rollNumber} Â· Room {pass.roomNumber} ({pass.hostelBlock})
                     </div>
                   </div>
 
@@ -478,6 +479,8 @@ export const WardenDashboard: React.FC = () => {
       {/* TAB 3: MAINTENANCE TASK DISPATCH & OPERATIONS REVIEW DESK */}
       {activeTab === 'workload' && (
         <div className="space-y-6">
+          {/* HOSTELCARE AI WARDEN PORTAL OVERVIEW */}
+          <HostelCareWardenPortal />
           {/* Top Metric Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
@@ -581,7 +584,7 @@ export const WardenDashboard: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-200 cursor-pointer"
             >
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>Real-Time Analytics HUD →</span>
+              <span>Real-Time Analytics HUD â†’</span>
             </button>
           </div>
 
@@ -893,7 +896,7 @@ export const WardenDashboard: React.FC = () => {
                               </p>
                             )}
                             <div className="text-3xs text-emerald-700 font-semibold pt-0.5">
-                              ✓ Verified by Warden Operations Desk
+                              âœ“ Verified by Warden Operations Desk
                             </div>
                           </div>
                         )}
@@ -1012,7 +1015,7 @@ export const WardenDashboard: React.FC = () => {
                         }}
                         className="w-full py-1.5 text-2xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors cursor-pointer text-center"
                       >
-                        Inspect {tech.tradeLabel} Queue →
+                        Inspect {tech.tradeLabel} Queue â†’
                       </button>
                     </div>
                   );
@@ -1033,7 +1036,7 @@ export const WardenDashboard: React.FC = () => {
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">Dispatch Task to Technician</h3>
                       <div className="text-2xs text-slate-500">
-                        {assigningComplaint.ticketNumber} · Room {assigningComplaint.roomNumber} ({assigningComplaint.hostelBlock})
+                        {assigningComplaint.ticketNumber} Â· Room {assigningComplaint.roomNumber} ({assigningComplaint.hostelBlock})
                       </div>
                     </div>
                   </div>
@@ -1041,7 +1044,7 @@ export const WardenDashboard: React.FC = () => {
                     onClick={() => setAssigningComplaint(null)}
                     className="text-slate-400 hover:text-slate-600 text-sm font-bold px-2 py-1 rounded"
                   >
-                    ✕
+                    âœ•
                   </button>
                 </div>
 
@@ -1084,7 +1087,7 @@ export const WardenDashboard: React.FC = () => {
                     >
                       {dutyTechniciansList.map((tech) => (
                         <option key={tech.id} value={`${tech.name} (${tech.tradeLabel})`}>
-                          {tech.name} — {tech.tradeLabel} ({tech.status})
+                          {tech.name} â€” {tech.tradeLabel} ({tech.status})
                         </option>
                       ))}
                     </select>
@@ -1150,7 +1153,7 @@ export const WardenDashboard: React.FC = () => {
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">Re-Open & Re-Dispatch Issue</h3>
                       <div className="text-2xs text-slate-500">
-                        {reopeningComplaint.ticketNumber} · Room {reopeningComplaint.roomNumber}
+                        {reopeningComplaint.ticketNumber} Â· Room {reopeningComplaint.roomNumber}
                       </div>
                     </div>
                   </div>
@@ -1158,7 +1161,7 @@ export const WardenDashboard: React.FC = () => {
                     onClick={() => setReopeningComplaint(null)}
                     className="text-slate-400 hover:text-slate-600 text-sm font-bold px-2 py-1 rounded"
                   >
-                    ✕
+                    âœ•
                   </button>
                 </div>
 
@@ -1377,3 +1380,4 @@ export const WardenDashboard: React.FC = () => {
     </div>
   );
 };
+
