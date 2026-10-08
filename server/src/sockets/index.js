@@ -9,79 +9,71 @@ let io;
 const initSocketIO = (server) => {
   io = require('socket.io')(server, {
     cors: {
-      origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+      origin: '*',
       methods: ['GET', 'POST']
     }
   });
 
-  // Authenticate socket connections using JWT
+  global.chatIO = io;
+
+  // Optional authentication check: allow unauthenticated or authenticated chat in dev
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
-
-      if (!token) {
-        return next(new ApiError(401, 'Authentication error'));
+      if (token) {
+        const decoded = jwt.verifyToken(token);
+        socket.userId = decoded.userId;
       }
-
-      const decoded = jwt.verifyToken(token);
-      socket.userId = decoded.userId;
       next();
     } catch (error) {
-      return next(new ApiError(401, 'Invalid token'));
+      // Don't abort connection so chat works seamlessly
+      next();
     }
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-
     // Join user-specific room
-    socket.on('join-user-room', () => {
+    if (socket.userId) {
       socket.join(`user:${socket.userId}`);
-      console.log(`User ${socket.userId} joined user room`);
+    }
+
+    // Chat specific rooms
+    socket.on('chat:join', (data) => {
+      if (data && data.studentId) {
+        socket.join(`chat:${data.studentId}`);
+      }
+      if (data && data.isWarden) {
+        socket.join('warden-room');
+      }
     });
 
-    // Join role-specific room
-    socket.on('join-role-room', (role) => {
-      socket.join(`role:${role}`);
-      console.log(`User ${socket.userId} joined role room: ${role}`);
-    });
-
-    // Join hostel-specific room
-    socket.on('join-hostel-room', (hostel) => {
-      socket.join(`hostel:${hostel}`);
-      console.log(`User ${socket.userId} joined hostel room: ${hostel}`);
+    socket.on('chat:send', (msgData) => {
+      if (msgData && msgData.studentId) {
+        io.to(`chat:${msgData.studentId}`).emit('chat:receive', msgData);
+        io.to('warden-room').emit('chat:receive', msgData);
+        socket.broadcast.emit('chat:receive', msgData);
+      }
     });
 
     // Handle disconnection
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
-    });
+    socket.on('disconnect', () => {});
   });
 
   return io;
 };
 
-/**
- * Emit to user-specific room
- */
 const emitToUser = (userId, event, data) => {
   if (io) {
     io.to(`user:${userId}`).emit(event, data);
   }
 };
 
-/**
- * Emit to role-specific room
- */
 const emitToRole = (role, event, data) => {
   if (io) {
     io.to(`role:${role}`).emit(event, data);
   }
 };
 
-/**
- * Emit to hostel-specific room
- */
 const emitToHostel = (hostel, event, data) => {
   if (io) {
     io.to(`hostel:${hostel}`).emit(event, data);

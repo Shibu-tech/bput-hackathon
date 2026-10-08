@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useCampusOps } from '../../context/CampusOpsContext';
 import { useAuth } from '../../context/AuthContext';
 import { translations } from '../../utils/translations';
@@ -30,8 +30,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import cafeteriaMealImg from '../../assets/images/cafeteria_meal_tray_1790190017280.jpg';
-import { StudentMarksheetView } from './StudentMarksheetView';
-import { StudentCertificateView } from './StudentCertificateView';
+import { HostelCareStudentComplaints } from './HostelCareStudentComplaints';
 
 export const StudentPortal: React.FC = () => {
   const {
@@ -340,7 +339,7 @@ export const StudentPortal: React.FC = () => {
     });
     setCart({});
     setOrderSuccess(
-      `Order ${newOrder.orderNumber} placed for ${newOrder.studentName}! Delivering to Room ${newOrder.roomNumber} (${newOrder.hostelBlock}) · OTP: ${newOrder.deliveryOtp}`
+      `Order ${newOrder.orderNumber} placed for ${newOrder.studentName}! Delivering to Room ${newOrder.roomNumber} (${newOrder.hostelBlock}) Â· OTP: ${newOrder.deliveryOtp}`
     );
     setTimeout(() => setOrderSuccess(null), 6000);
   };
@@ -394,8 +393,8 @@ export const StudentPortal: React.FC = () => {
               <span className="text-xs text-slate-500 font-mono">{studentRoll}</span>
             </div>
             <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-              <span>{deliveryHostel} · Room {deliveryRoom}</span>
-              <span aria-hidden="true">·</span>
+              <span>{deliveryHostel} Â· Room {deliveryRoom}</span>
+              <span aria-hidden="true">Â·</span>
               <span className="text-emerald-600 font-medium">Verified Student Account</span>
             </div>
           </div>
@@ -671,7 +670,7 @@ export const StudentPortal: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-base font-bold text-slate-900">Room {room.roomNumber}</span>
-                        <span className="text-xs text-slate-500 ml-2">{room.block} · Floor {room.floor}</span>
+                        <span className="text-xs text-slate-500 ml-2">{room.block} Â· Floor {room.floor}</span>
                       </div>
                       <span className="text-xs font-medium text-slate-600 capitalize">
                         {vacantBeds.length} Vacant {vacantBeds.length === 1 ? 'Bed' : 'Beds'}
@@ -721,7 +720,7 @@ export const StudentPortal: React.FC = () => {
                                 </span>
                               </div>
                               <div className="text-2xs text-slate-500">
-                                {bed.occupant.branch || 'Computer Science'} · {bed.occupant.year || '1st Year'}
+                                {bed.occupant.branch || 'Computer Science'} Â· {bed.occupant.year || '1st Year'}
                               </div>
                               <div className="flex flex-wrap gap-1 pt-1">
                                 {(bed.occupant.habits || habitTags).map((h, i) => (
@@ -762,178 +761,9 @@ export const StudentPortal: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-VIEW 3: DIRECT COMPLAINT TICKETING */}
+      {/* SUB-VIEW 3: HOSTELCARE AI COMPLAINT TICKETING & TRACKING WORKFLOW */}
       {activeTab === 'complaints' && (
-        <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Campus Requisitions & Grievance Redressal
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Hostel maintenance issues route to the <strong>Hostel Warden</strong>. Academic concerns route directly to your <strong>Head of Department (HOD)</strong>.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setComplaintDomain('hostel');
-                  setComplaintCategory('electrical');
-                  setShowComplaintModal(true);
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Log Grievance / Requisition
-              </button>
-            </div>
-
-            {/* Filter Pills: All vs Hostel (Warden) vs Academic (HOD) */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              <span className="text-2xs uppercase tracking-wider text-slate-400 font-semibold mr-1">Filter Desk:</span>
-              {[
-                { id: 'all', label: 'All Requests', count: complaints.length },
-                { id: 'hostel', label: '🏠 Hostel Maintenance (Warden)', count: complaints.filter(isHostelComplaint).length },
-                { id: 'academic', label: '🎓 Academic Grievances (HOD)', count: complaints.filter(isAcademicComplaint).length },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setComplaintDomainFilter(f.id as any)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors whitespace-nowrap ${complaintDomainFilter === f.id
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                >
-                  {f.label} ({f.count})
-                </button>
-              ))}
-            </div>
-
-            {/* Complaints List */}
-            <div className="space-y-3">
-              {complaints
-                .filter((c) => {
-                  if (complaintDomainFilter === 'hostel') return isHostelComplaint(c);
-                  if (complaintDomainFilter === 'academic') return isAcademicComplaint(c);
-                  return true;
-                })
-                .map((c) => {
-                  const isMine = c.rollNumber === studentRoll;
-                  const isAcad = isAcademicComplaint(c);
-                  return (
-                    <div
-                      key={c.id}
-                      className={`border rounded-xl p-4 transition-all ${isMine ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-200 bg-white'
-                        }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs font-bold text-slate-900">{c.ticketNumber}</span>
-                          <span
-                            className={`text-2xs uppercase font-bold px-2 py-0.5 rounded border ${isAcad
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-blue-50 text-blue-700 border-blue-200'
-                              }`}
-                          >
-                            {isAcad ? '🎓 HOD Academic' : '🏠 Warden Hostel'}
-                          </span>
-                          <span className="text-xs uppercase font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                            {c.category.replace('academic_', '')}
-                          </span>
-                          {c.masterTicketId && (
-                            <span className="text-2xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded flex items-center gap-1">
-                              <Sparkles className="w-3 h-3 text-purple-500" />
-                              Grouped with Wing Outage
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-2xs font-semibold uppercase px-2 py-0.5 rounded ${c.status === 'resolved'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : c.status === 'in_progress'
-                                  ? 'bg-blue-50 text-blue-700'
-                                  : c.status === 'rejected'
-                                    ? 'bg-rose-50 text-rose-700 font-bold'
-                                    : c.status === 'assigned'
-                                      ? 'bg-indigo-50 text-indigo-700'
-                                      : 'bg-amber-50 text-amber-700 font-semibold'
-                              }`}
-                          >
-                            {c.status === 'open'
-                              ? isAcad
-                                ? 'Awaiting HOD Review'
-                                : 'Awaiting Warden Dispatch'
-                              : c.status === 'assigned'
-                                ? isAcad
-                                  ? 'Faculty/Staff Action'
-                                  : 'Technician Dispatched'
-                                : c.status.replace('_', ' ')}
-                          </span>
-                          <button
-                            onClick={() => upvoteComplaint(c.id)}
-                            title="I also experience this problem"
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-2 py-1 rounded border border-slate-200 cursor-pointer transition-colors"
-                          >
-                            <ThumbsUp className="w-3 h-3" />
-                            <span className="font-mono tabular-nums text-xs">{c.upvotes}</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <h3 className="text-sm font-semibold text-slate-900 mt-2">{c.title}</h3>
-                      <p className="text-xs text-slate-600 mt-1">{c.description}</p>
-
-                      <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-slate-100 text-2xs text-slate-500">
-                        <span>
-                          {isAcad
-                            ? `${c.department || 'CSE'} Dept · ${c.roomNumber || 'Academic Block'}`
-                            : `Room ${c.roomNumber} (${c.hostelBlock})`}
-                        </span>
-                        <span aria-hidden="true">·</span>
-                        <span>Desk: <strong>{isAcad ? 'Head of Dept (HOD)' : 'Hostel Warden'}</strong></span>
-                        {c.assignedTo ? (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span>Assigned: <strong>{c.assignedTo}</strong></span>
-                            {c.assignedBy && (
-                              <>
-                                <span aria-hidden="true">·</span>
-                                <span>By: <strong>{c.assignedBy}</strong></span>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              {isAcad ? 'Pending HOD Decision' : 'Awaiting Warden Assignment'}
-                            </span>
-                          </>
-                        )}
-                        {c.wardenNotes && (
-                          <div className="w-full text-indigo-700 bg-indigo-50 p-2 rounded mt-1 border border-indigo-100">
-                            <strong>{isAcad ? 'HOD Remarks:' : 'Warden Directive:'}</strong> {c.wardenNotes}
-                          </div>
-                        )}
-                        {c.resolutionNotes && (
-                          <div className="w-full text-emerald-700 font-medium bg-emerald-50 p-2 rounded mt-1 border border-emerald-100">
-                            <strong>Resolution:</strong> {c.resolutionNotes}
-                          </div>
-                        )}
-                        {c.status === 'rejected' && c.rejectionReason && (
-                          <div className="w-full text-rose-700 font-medium bg-rose-50 p-2 rounded mt-1 border border-rose-200">
-                            <strong>Rejection Note:</strong> {c.rejectionReason}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
+        <HostelCareStudentComplaints />
       )}
 
       {/* SUB-VIEW 4: MESS MENU & IN-ROOM CAFETERIA DELIVERY */}
@@ -1004,7 +834,7 @@ export const StudentPortal: React.FC = () => {
                             </div>
                           )}
                           <div className="flex items-center justify-between text-3xs text-slate-500 pt-1">
-                            <span className="capitalize">{item.type} · {item.calories} kcal</span>
+                            <span className="capitalize">{item.type} Â· {item.calories} kcal</span>
                             <div className="flex items-center gap-1 text-amber-600">
                               <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
                               <span className="font-mono">{ratingData.rating}</span>
@@ -1039,10 +869,10 @@ export const StudentPortal: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
                   <span>Delivered directly to:</span>
                   <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                    👤 {studentDisplayName}
+                    ðŸ‘¤ {studentDisplayName}
                   </span>
                   <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    🏢 {deliveryHostel} · Room {deliveryRoom}
+                    ðŸ¢ {deliveryHostel} Â· Room {deliveryRoom}
                   </span>
                 </div>
               </div>
@@ -1054,7 +884,7 @@ export const StudentPortal: React.FC = () => {
                       Total Bill
                     </span>
                     <span className="font-mono font-extrabold text-sm text-slate-900">
-                      ₹{cartTotalAmount}
+                      â‚¹{cartTotalAmount}
                     </span>
                   </div>
                   <button
@@ -1084,18 +914,18 @@ export const StudentPortal: React.FC = () => {
                             Order Placed: {activeCancellableOrder.orderNumber}
                           </span>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-xs font-mono border border-emerald-300 shadow-2xs">
-                            Total Bill: ₹{activeCancellableOrder.totalAmount}
+                            Total Bill: â‚¹{activeCancellableOrder.totalAmount}
                           </span>
                         </div>
                         <p className="text-slate-600 mt-1 text-2xs">
-                          Delivering to <strong>{activeCancellableOrder.studentName}</strong> · Room <strong>{activeCancellableOrder.roomNumber}</strong> ({activeCancellableOrder.hostelBlock}) · Handoff OTP: <strong className="font-mono text-indigo-700">{activeCancellableOrder.deliveryOtp}</strong>
+                          Delivering to <strong>{activeCancellableOrder.studentName}</strong> Â· Room <strong>{activeCancellableOrder.roomNumber}</strong> ({activeCancellableOrder.hostelBlock}) Â· Handoff OTP: <strong className="font-mono text-indigo-700">{activeCancellableOrder.deliveryOtp}</strong>
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-amber-900 font-medium text-xs">
                           <span>
-                            ⚠️ You can cancel your order if you want within <strong>2 minutes</strong>. Cancellation timer:
+                            âš ï¸ You can cancel your order if you want within <strong>2 minutes</strong>. Cancellation timer:
                           </span>
                           <span className="font-mono font-extrabold text-xs text-rose-700 bg-white px-2 py-0.5 rounded-md border border-amber-300 shadow-2xs">
-                            ⏱️ {formattedTime}
+                            â±ï¸ {formattedTime}
                           </span>
                         </div>
                       </div>
@@ -1171,7 +1001,7 @@ export const StudentPortal: React.FC = () => {
                     </div>
                     <div className="font-semibold text-xs text-slate-900 leading-snug">{food.name}</div>
                     <div className="flex items-center justify-between pt-1">
-                      <span className="font-mono text-xs font-bold text-slate-900">₹{food.price}</span>
+                      <span className="font-mono text-xs font-bold text-slate-900">â‚¹{food.price}</span>
                       <div className="flex items-center gap-1.5">
                         {isOutOfStock ? (
                           <span className="px-2.5 py-1 rounded bg-slate-200 text-slate-500 text-2xs font-semibold cursor-not-allowed select-none">
@@ -1239,10 +1069,10 @@ export const StudentPortal: React.FC = () => {
                               {o.status.replace('_', ' ')}
                             </span>
                             <span className="text-slate-800 font-semibold text-2xs">
-                              👤 {o.studentName}
+                              ðŸ‘¤ {o.studentName}
                             </span>
                             <span className="text-slate-500 text-2xs">
-                              · Room {o.roomNumber} ({o.hostelBlock})
+                              Â· Room {o.roomNumber} ({o.hostelBlock})
                             </span>
                           </div>
 
@@ -1273,7 +1103,7 @@ export const StudentPortal: React.FC = () => {
                               Total Bill:
                             </span>
                             <span className="font-mono font-extrabold text-sm text-emerald-400">
-                              ₹{o.totalAmount}
+                              â‚¹{o.totalAmount}
                             </span>
                           </div>
                         </div>
@@ -1287,7 +1117,7 @@ export const StudentPortal: React.FC = () => {
                                 You can cancel your order if you want within <strong>2 minutes</strong>. Time remaining:
                               </span>
                               <span className="font-mono font-extrabold text-xs text-rose-700 bg-white px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs">
-                                ⏱️ {formattedTime}
+                                â±ï¸ {formattedTime}
                               </span>
                             </div>
                             <button
@@ -1303,7 +1133,7 @@ export const StudentPortal: React.FC = () => {
                         {/* When 2 minutes expire and order is received */}
                         {!canCancel && o.status === 'received' && remainingSeconds === 0 && (
                           <div className="text-3xs text-slate-400 font-medium">
-                            Cancellation window closed (2 min elapsed) · Order locked for kitchen prep
+                            Cancellation window closed (2 min elapsed) Â· Order locked for kitchen prep
                           </div>
                         )}
 
@@ -1356,33 +1186,33 @@ export const StudentPortal: React.FC = () => {
                                   </div>
                                   <span className="text-xs font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
                                     {reviewRating === 5
-                                      ? '5.0 - Excellent! 🔥'
+                                      ? '5.0 - Excellent! ðŸ”¥'
                                       : reviewRating === 4
-                                        ? '4.0 - Very Good 👍'
-                                        : reviewRating === 3
-                                          ? '3.0 - Average 🙂'
-                                          : reviewRating === 2
-                                            ? '2.0 - Below Expectations 😕'
-                                            : '1.0 - Poor 😞'}
+                                      ? '4.0 - Very Good ðŸ‘'
+                                      : reviewRating === 3
+                                      ? '3.0 - Average ðŸ™‚'
+                                      : reviewRating === 2
+                                      ? '2.0 - Below Expectations ðŸ˜•'
+                                      : '1.0 - Poor ðŸ˜ž'}
                                   </span>
                                 </div>
 
                                 {/* Quick feedback chips */}
                                 <div className="flex flex-wrap gap-1.5">
                                   {[
-                                    'Hot & Fresh 🔥',
-                                    'Super Fast ⚡',
-                                    'Tasty & Cheesy 😋',
-                                    'Crispy Kathi Roll 🌯',
-                                    'Chilled Drink 🥤',
-                                    'Well Packaged 📦',
+                                    'Hot & Fresh ðŸ”¥',
+                                    'Super Fast âš¡',
+                                    'Tasty & Cheesy ðŸ˜‹',
+                                    'Crispy Kathi Roll ðŸŒ¯',
+                                    'Chilled Drink ðŸ¥¤',
+                                    'Well Packaged ðŸ“¦',
                                   ].map((chip) => (
                                     <button
                                       key={chip}
                                       type="button"
                                       onClick={() => {
                                         if (!reviewText.includes(chip)) {
-                                          setReviewText((prev) => (prev ? `${prev} · ${chip}` : chip));
+                                          setReviewText((prev) => (prev ? `${prev} Â· ${chip}` : chip));
                                         }
                                       }}
                                       className="text-3xs px-2 py-0.5 rounded-full bg-white border border-amber-200 text-slate-700 hover:bg-amber-100 cursor-pointer transition-colors"
@@ -1436,7 +1266,7 @@ export const StudentPortal: React.FC = () => {
                                       {o.rating}.0 / 5.0
                                     </span>
                                     <span className="text-3xs bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-semibold border border-emerald-200">
-                                      ✓ Review Visible in Mess Portal
+                                      âœ“ Review Visible in Mess Portal
                                     </span>
                                   </div>
                                   <button
@@ -1719,7 +1549,7 @@ export const StudentPortal: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900">Request Digital Gate Pass</h3>
               <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -1897,8 +1727,8 @@ export const StudentPortal: React.FC = () => {
                     : 'Submitted directly to Hostel Warden Desk for technician dispatch.'}
                 </p>
               </div>
-              <button onClick={() => setShowComplaintModal(false)} className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
-                ✕
+              <button onClick={() => setShowComplaintModal(false)} className="text-slate-400 hover:text-slate-600 text-xs">
+                âœ•
               </button>
             </div>
 
@@ -1910,17 +1740,24 @@ export const StudentPortal: React.FC = () => {
               <form onSubmit={handleCreateComplaint} className="space-y-3.5 text-xs">
                 {/* Domain Selector Tabs */}
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1.5">Requisition Target Desk</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setComplaintDomain('hostel');
-                        setComplaintCategory('electrical');
-                      }}
-                      className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${complaintDomain === 'hostel'
-                          ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 font-semibold shadow-xs ring-1 ring-indigo-500'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'electrical', label: 'âš¡ Electrical' },
+                      { id: 'plumbing', label: 'ðŸš° Plumbing' },
+                      { id: 'wifi', label: 'ðŸ“¶ Wi-Fi / IT' },
+                      { id: 'carpentry', label: 'ðŸª‘ Carpentry' },
+                      { id: 'ac', label: 'â„ï¸ AC / HVAC' },
+                      { id: 'cleaning', label: 'ðŸ§¹ Housekeeping' },
+                    ].map((cat) => (
+                      <button
+                        type="button"
+                        key={cat.id}
+                        onClick={() => setComplaintCategory(cat.id as ComplaintCategory)}
+                        className={`py-2 px-1 text-center rounded border cursor-pointer ${
+                          complaintCategory === cat.id
+                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold'
+                            : 'border-slate-200 text-slate-700 hover:bg-slate-50'
                         }`}
                     >
                       <div className="flex items-center gap-1.5 text-xs font-bold">
@@ -2056,21 +1893,11 @@ export const StudentPortal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className={`p-2.5 rounded border text-2xs space-y-1 ${complaintDomain === 'academic'
-                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
-                    : 'bg-amber-50/80 border-amber-200 text-amber-900'
-                  }`}>
-                  <div className="flex items-center justify-between font-semibold">
-                    <span>
-                      {complaintDomain === 'academic'
-                        ? `Department: ${user?.department || 'Computer Science (CSE)'}`
-                        : `Location: Room ${deliveryRoom} · ${deliveryHostel}`}
-                    </span>
-                    <span className={`px-1.5 py-0.5 rounded font-mono text-3xs font-bold ${complaintDomain === 'academic'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
-                      }`}>
-                      {complaintDomain === 'academic' ? 'Protocol: HOD Review' : 'Protocol: Warden Review'}
+                <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded text-amber-900 text-2xs space-y-1">
+                  <div className="flex items-center justify-between font-semibold text-amber-800">
+                    <span>Location: Room {deliveryRoom} Â· {deliveryHostel}</span>
+                    <span className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-mono text-3xs font-bold">
+                      Protocol: Warden Review
                     </span>
                   </div>
                   <p className="text-3xs opacity-90">
@@ -2106,3 +1933,4 @@ export const StudentPortal: React.FC = () => {
     </div>
   );
 };
+

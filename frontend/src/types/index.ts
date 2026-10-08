@@ -86,6 +86,7 @@ export interface Complaint {
   photoUrl?: string;
   masterTicketId?: string; // If grouped into deduplicated issue
   upvotes: number;
+  aiSummary?: string;
 }
 
 export const isAcademicComplaint = (c: Complaint): boolean => {

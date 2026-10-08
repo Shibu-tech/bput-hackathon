@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 
 const ticketSchema = new mongoose.Schema({
   clientRequestId: {
@@ -70,10 +70,27 @@ const ticketSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Gemini AI metadata
+  aiSummary: {
+    type: String,
+    default: ''
+  },
+  aiPriority: {
+    type: String,
+    default: 'Medium'
+  },
+  aiConfidence: {
+    type: Number,
+    default: 90
+  },
+  photoUrl: {
+    type: String,
+    default: ''
+  },
   statusHistory: [{
     status: {
       type: String,
-      enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'DUPLICATE']
+      enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'DUPLICATE', 'REJECTED']
     },
     changedAt: {
       type: Date,

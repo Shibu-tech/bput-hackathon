@@ -1,4 +1,4 @@
-const { z } = require('zod');
+﻿const { z } = require('zod');
 
 /**
  * Ticket creation validation schema
@@ -10,7 +10,11 @@ const ticketSchema = z.object({
   title: z.string().optional(),
   category: z.string().default('OTHER'),
   description: z.string().min(1),
-  clientRequestId: z.string().optional() // Optional for idempotency
+  clientRequestId: z.string().optional(),
+  aiSummary: z.string().optional(),
+  aiPriority: z.string().optional(),
+  aiConfidence: z.number().optional(),
+  photoUrl: z.string().optional()
 });
 
 module.exports = {
